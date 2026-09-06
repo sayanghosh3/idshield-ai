@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Shield, Cpu, Sliders, FileText, Globe, Lock, Info, Save, ToggleLeft, ToggleRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Input } from '../components/common/Input';
 import { Progress } from '../components/common/Progress';
+import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function Settings() {
   const [activeTab, setActiveTab] = useState('system');
@@ -21,68 +23,69 @@ export function Settings() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-text">Settings</h1>
-        <p className="text-muted-text">Configure system behavior and integrations</p>
-      </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <FadeIn>
+        <div>
+          <h1 className="text-2xl font-bold text-text">Settings</h1>
+          <p className="text-muted-text">Configure system behavior and integrations</p>
+        </div>
+      </FadeIn>
 
-      <Card padding="none">
-        <CardContent className="p-0">
-          <div className="flex flex-col lg:flex-row">
-            <nav className="lg:w-48 border-r border-border bg-panel-secondary/50">
-              <ul className="p-2 space-y-1" role="tablist">
-                {tabs.map(tab => {
-                  const Icon = tab.icon;
-                  const isActive = activeTab === tab.id;
-                  return (
-                    <li key={tab.id} role="presentation">
-                      <button
-                        role="tab"
-                        aria-selected={isActive}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={cn(
-                          'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                          isActive
-                            ? 'bg-primary-accent/20 text-primary-accent'
-                            : 'text-muted-text hover:text-text hover:bg-panel-secondary'
-                        )}
-                      >
-                        <Icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
-                        <span>{tab.label}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </nav>
+      <FadeIn delay={0.1}>
+        <Card padding="none">
+          <CardContent className="p-0">
+            <div className="flex flex-col lg:flex-row">
+              <nav className="lg:w-48 border-r border-border bg-panel-secondary/50">
+                <ul className="p-2 space-y-1" role="tablist">
+                  {tabs.map(tab => {
+                    const Icon = tab.icon;
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <li key={tab.id} role="presentation">
+                        <motion.button
+                          role="tab"
+                          aria-selected={isActive}
+                          onClick={() => setActiveTab(tab.id)}
+                          whileHover={{ x: 4 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={cn(
+                            'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+                            isActive
+                              ? 'bg-primary-accent/20 text-primary-accent'
+                              : 'text-muted-text hover:text-text hover:bg-panel-secondary'
+                          )}
+                        >
+                          <Icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                          <span>{tab.label}</span>
+                        </motion.button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
 
-            <div className="flex-1 p-6 lg:p-8 overflow-y-auto">
-              {activeTab === 'system' && (
-                <SystemSettings />
-              )}
-              {activeTab === 'ai' && (
-                <AISettings />
-              )}
-              {activeTab === 'thresholds' && (
-                <ThresholdSettings />
-              )}
-              {activeTab === 'documents' && (
-                <DocumentSettings />
-              )}
-              {activeTab === 'api' && (
-                <APISettings />
-              )}
-              {activeTab === 'security' && (
-                <SecuritySettings />
-              )}
-              {activeTab === 'about' && (
-                <AboutSettings />
-              )}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex-1 p-6 lg:p-8 overflow-y-auto"
+                >
+                  {activeTab === 'system' && <SystemSettings />}
+                  {activeTab === 'ai' && <AISettings />}
+                  {activeTab === 'thresholds' && <ThresholdSettings />}
+                  {activeTab === 'documents' && <DocumentSettings />}
+                  {activeTab === 'api' && <APISettings />}
+                  {activeTab === 'security' && <SecuritySettings />}
+                  {activeTab === 'about' && <AboutSettings />}
+                </motion.div>
+              </AnimatePresence>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </FadeIn>
     </div>
   );
 }

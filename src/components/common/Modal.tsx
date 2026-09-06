@@ -1,5 +1,6 @@
 import { Fragment, ReactNode, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from './Button';
@@ -44,8 +45,6 @@ export function Modal({
     };
   }, [isOpen, handleEscape]);
 
-  if (!isOpen) return null;
-
   const sizes = {
     sm: 'max-w-md',
     md: 'max-w-lg',
@@ -55,31 +54,55 @@ export function Modal({
   };
 
   const modalContent = (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby={title ? 'modal-title' : undefined} aria-describedby={description ? 'modal-description' : undefined}>
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div
-          className="fixed inset-0 bg-background/80 backdrop-blur-sm transition-opacity"
-          onClick={closeOnOverlayClick ? onClose : undefined}
-          aria-hidden="true"
-        />
-        <div className={cn('relative w-full bg-panel border border-border rounded-xl shadow-xl', sizes[size])}>
-          {(title || showCloseButton) && (
-            <div className="flex items-start justify-between p-6 border-b border-border/50">
-              <div>
-                {title && <h2 id="modal-title" className="text-lg font-semibold text-text">{title}</h2>}
-                {description && <p id="modal-description" className="mt-1 text-sm text-muted-text">{description}</p>}
-              </div>
-              {showCloseButton && (
-                <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close modal">
-                  <X className="h-4 w-4" />
-                </Button>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className="fixed inset-0 z-50 overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? 'modal-title' : undefined}
+          aria-describedby={description ? 'modal-description' : undefined}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="flex min-h-full items-center justify-center p-4">
+            <motion.div
+              className="fixed inset-0 bg-background/80 backdrop-blur-sm"
+              onClick={closeOnOverlayClick ? onClose : undefined}
+              aria-hidden="true"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            />
+            <motion.div
+              className={cn('relative w-full bg-panel border border-border rounded-xl shadow-xl', sizes[size])}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+            >
+              {(title || showCloseButton) && (
+                <div className="flex items-start justify-between p-6 border-b border-border/50">
+                  <div>
+                    {title && <h2 id="modal-title" className="text-lg font-semibold text-text">{title}</h2>}
+                    {description && <p id="modal-description" className="mt-1 text-sm text-muted-text">{description}</p>}
+                  </div>
+                  {showCloseButton && (
+                    <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close modal" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          <div className="p-6">{children}</div>
-        </div>
-      </div>
-    </div>
+              <div className="p-6">{children}</div>
+            </motion.div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 
   if (typeof window === 'undefined') return null;

@@ -130,3 +130,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    .motion-reduce\:transition-none {
+      transition: none !important;
+    }
+    .motion-reduce\:animate-none {
+      animation: none !important;
+    }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .motion-safe\:transition-all {
+      transition: all;
+    }
+    .motion-safe\:animate-fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+  }
+}

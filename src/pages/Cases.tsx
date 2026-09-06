@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 import { Search, Filter, ChevronDown, Download, FileText } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
@@ -9,6 +10,7 @@ import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
 import { mockCases, caseStatusOptions, riskLevelOptions } from '../mocks/cases';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
+import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function Cases() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,118 +62,136 @@ export function Cases() {
   const getStatusConfig = (status: string) => caseStatusOptions.find(s => s.value === status) || { color: '' };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-text">Cases</h1>
-          <p className="text-muted-text">Manage and review screening cases</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" onClick={() => setShowFilters(!showFilters)}>
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
-          </Button>
-          <Button variant="primary">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </div>
-
-      {showFilters && (
-        <Card padding="md" className="animate-slide-up">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search cases, names, passport numbers..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                label="Search"
-              />
-            </div>
-            <div>
-              <label className="label">Status</label>
-              <div className="flex flex-wrap gap-2">
-                {caseStatusOptions.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={statusFilter.includes(opt.value)}
-                      onChange={e => setStatusFilter(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
-                      className="rounded border-border text-primary-accent focus:ring-primary-accent"
-                    />
-                    <span className="text-sm">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="label">Risk Level</label>
-              <div className="flex flex-wrap gap-2">
-                {riskLevelOptions.map(opt => (
-                  <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={riskFilter.includes(opt.value)}
-                      onChange={e => setRiskFilter(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
-                      className="rounded border-border text-primary-accent focus:ring-primary-accent"
-                    />
-                    <Badge variant={opt.value === 'high' ? 'danger' : opt.value === 'review' ? 'warning' : 'success'} size="sm">
-                      {opt.label}
-                    </Badge>
-                  </label>
-                ))}
-              </div>
-            </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <FadeIn>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-text">Cases</h1>
+            <p className="text-muted-text">Manage and review screening cases</p>
           </div>
-        </Card>
-      )}
-
-      <Card padding="none">
-        <CardContent className="p-0">
-          <Table
-            columns={[
-              { key: 'caseNumber', header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
-              { key: 'subjectName', header: 'Name' },
-              { key: 'documentType', header: 'Document' },
-              { key: 'riskScore', header: 'Risk', render: (row) => (
-                <div className="flex items-center gap-2">
-                  <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
-                  <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
-                    {getRiskLevelLabel(row.riskLevel)}
-                  </Badge>
-                </div>
-              )},
-              { key: 'status', header: 'Status', render: (row) => {
-                const config = getStatusConfig(row.status);
-                return <Badge variant="neutral" className={config.color}>{row.status.replace('_', ' ')}</Badge>;
-              }},
-              { key: 'createdAt', header: 'Created', render: (row) => formatRelativeTime(row.createdAt) },
-              { key: 'actions', header: 'Actions', render: (row) => (
-                <div className="flex items-center gap-2">
-                  <Link to={`/cases/${row.id}`} className="btn-secondary text-sm">Open</Link>
-                  <Button variant="ghost" size="sm" className="text-sm">
-                    <FileText className="w-4 h-4" />
-                  </Button>
-                </div>
-              )},
-            ]}
-            data={filteredCases}
-            keyExtractor={row => row.id}
-            clickable
-            onRowClick={row => window.location.href = `/cases/${row.id}`}
-            striped
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex items-center justify-between text-sm text-muted-text">
-        <span>Showing {filteredCases.length} of {mockCases.length} cases</span>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" disabled>Previous</Button>
-          <Button variant="ghost" size="sm" disabled>Next</Button>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={() => setShowFilters(!showFilters)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Filter className="w-4 h-4 mr-2" />
+              Filters
+            </Button>
+            <Button variant="primary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </div>
         </div>
-      </div>
+      </FadeIn>
+
+      <FadeIn delay={0.1}>
+        <AnimatePresence mode="wait">
+          {showFilters && (
+            <motion.div
+              key="filters"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card padding="md">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Search cases, names, passport numbers..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      label="Search"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Status</label>
+                    <div className="flex flex-wrap gap-2">
+                      {caseStatusOptions.map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={statusFilter.includes(opt.value)}
+                            onChange={e => setStatusFilter(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
+                            className="rounded border-border text-primary-accent focus:ring-primary-accent"
+                          />
+                          <span className="text-sm">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Risk Level</label>
+                    <div className="flex flex-wrap gap-2">
+                      {riskLevelOptions.map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={riskFilter.includes(opt.value)}
+                            onChange={e => setRiskFilter(prev => e.target.checked ? [...prev, opt.value] : prev.filter(v => v !== opt.value))}
+                            className="rounded border-border text-primary-accent focus:ring-primary-accent"
+                          />
+                          <Badge variant={opt.value === 'high' ? 'danger' : opt.value === 'review' ? 'warning' : 'success'} size="sm">
+                            {opt.label}
+                          </Badge>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </FadeIn>
+
+      <FadeIn delay={0.15}>
+        <Card padding="none">
+          <CardContent className="p-0">
+            <Table
+              columns={[
+                { key: 'caseNumber', header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
+                { key: 'subjectName', header: 'Name' },
+                { key: 'documentType', header: 'Document' },
+                { key: 'riskScore', header: 'Risk', render: (row) => (
+                  <div className="flex items-center gap-2">
+                    <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
+                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
+                      {getRiskLevelLabel(row.riskLevel)}
+                    </Badge>
+                  </div>
+                )},
+                { key: 'status', header: 'Status', render: (row) => {
+                  const config = getStatusConfig(row.status);
+                  return <Badge variant="neutral" className={config.color}>{row.status.replace('_', ' ')}</Badge>;
+                }},
+                { key: 'createdAt', header: 'Created', render: (row) => formatRelativeTime(row.createdAt) },
+                { key: 'actions', header: 'Actions', render: (row) => (
+                  <div className="flex items-center gap-2">
+                    <Link to={`/cases/${row.id}`} className="btn-secondary text-sm">Open</Link>
+                    <Button variant="ghost" size="sm" className="text-sm" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
+                      <FileText className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )},
+              ]}
+              data={filteredCases}
+              keyExtractor={row => row.id}
+              clickable
+              onRowClick={row => window.location.href = `/cases/${row.id}`}
+              striped
+            />
+          </CardContent>
+        </Card>
+      </FadeIn>
+
+      <FadeIn delay={0.2}>
+        <div className="flex items-center justify-between text-sm text-muted-text">
+          <span>Showing {filteredCases.length} of {mockCases.length} cases</span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" disabled>Previous</Button>
+            <Button variant="ghost" size="sm" disabled>Next</Button>
+          </div>
+        </div>
+      </FadeIn>
     </div>
   );
 }

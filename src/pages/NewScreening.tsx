@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, X, CheckCircle, AlertCircle, Loader2, FileText, Image, Upload, RotateCcw, ZoomIn, ZoomOut, Maximize2, Minimize2, Shield } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
@@ -17,6 +18,7 @@ import { demoDocuments, demoOCRResults, documentTypes, allowedFileTypes, maxFile
 import { screeningSteps, createDemoCase } from '../mocks/screeningData';
 import { ScreeningStep } from '../types';
 import { formatFileSize, formatRelativeTime, getRiskLevelLabel } from '../utils/formatters';
+import { FadeIn, StaggerContainer, AnimatedNumber, AnimatedStatus } from '../components/animations';
 
 const STEP_ORDER: readonly ScreeningStep[] = ['upload', 'extraction', 'validation', 'forensics', 'face_verification', 'risk_assessment', 'result'];
 
@@ -199,322 +201,372 @@ export function NewScreening() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold text-text">New Screening</h1>
-            <p className="text-muted-text">Multi-step AI-powered document screening workflow</p>
+    <div className="max-w-6xl mx-auto space-y-6">
+      <FadeIn>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-text">New Screening</h1>
+              <p className="text-muted-text">Multi-step AI-powered document screening workflow</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {demoEnabled && activeScenario && (
+              <Badge variant="info" className="gap-1">
+                <span className="w-2 h-2 rounded-full bg-primary-accent" />
+                {scenarios.find(s => s.id === activeScenario)?.name}
+              </Badge>
+            )}
+            <Button variant="ghost" onClick={() => setShowDemoModal(true)}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              Demo Scenarios
+            </Button>
+            <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
+              <RotateCcw className="w-4 h-4" />
+              Reset
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {demoEnabled && activeScenario && (
-            <Badge variant="info" className="gap-1">
-              <span className="w-2 h-2 rounded-full bg-primary-accent" />
-              {scenarios.find(s => s.id === activeScenario)?.name}
-            </Badge>
-          )}
-          <Button variant="ghost" onClick={() => setShowDemoModal(true)}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            Demo Scenarios
-          </Button>
-          <Button variant="secondary" onClick={handleReset} disabled={isProcessing}>
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </Button>
-        </div>
-      </div>
+      </FadeIn>
 
-      <StepProgress
-        steps={screeningSteps.map(s => s.label)}
-        currentStep={currentStepIndex}
-        completedSteps={completedSteps.map(s => STEP_ORDER.indexOf(s))}
-        className="mb-6"
-      />
+      <FadeIn delay={0.1}>
+        <StepProgress
+          steps={screeningSteps.map(s => s.label)}
+          currentStep={currentStepIndex}
+          completedSteps={completedSteps.map(s => STEP_ORDER.indexOf(s))}
+          className="mb-6"
+        />
+      </FadeIn>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <Tabs defaultValue="upload" value={activeTab} onChange={setActiveTab} variant="enclosed">
-            <TabsList className="grid grid-cols-7 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Screening steps">
-              {screeningSteps.map((step, index) => {
-                const status = getStepStatus(step.step);
-                return (
-                  <TabTrigger
-                    key={step.step}
-                    value={step.step}
-                    disabled={index > currentStepIndex && !isStepCompleted(step.step) && !demoEnabled}
-                    className={cn(
-                      'py-2 px-3 text-xs font-medium',
-                      status === 'completed' && 'bg-success text-white',
-                      status === 'active' && 'bg-primary-accent text-background',
-                      status === 'pending' && 'text-muted-text'
-                    )}
-                  >
-                    <div className="flex items-center justify-center gap-1.5">
-                      <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold">
-                        {status === 'completed' ? <CheckCircle className="w-3 h-3" /> : step.number}
-                      </span>
-                      <span className="hidden sm:inline">{step.label}</span>
-                    </div>
-                  </TabTrigger>
-                );
-              })}
-            </TabsList>
+      <FadeIn delay={0.15}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Tabs defaultValue="upload" value={activeTab} onChange={setActiveTab} variant="enclosed">
+              <TabsList className="grid grid-cols-7 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Screening steps">
+                {screeningSteps.map((step, index) => {
+                  const status = getStepStatus(step.step);
+                  return (
+                    <TabTrigger
+                      key={step.step}
+                      value={step.step}
+                      disabled={index > currentStepIndex && !isStepCompleted(step.step) && !demoEnabled}
+                      className={cn(
+                        'py-2 px-3 text-xs font-medium transition-all duration-200',
+                        status === 'completed' && 'bg-success text-white',
+                        status === 'active' && 'bg-primary-accent text-background',
+                        status === 'pending' && 'text-muted-text'
+                      )}
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <AnimatedStatus status={status as 'completed' | 'processing' | 'pending' | 'failed'} />
+                        <span className="hidden sm:inline">{step.label}</span>
+                      </div>
+                    </TabTrigger>
+                  );
+                })}
+              </TabsList>
 
             <TabContent value="upload">
-              <Card padding="lg">
-                <CardHeader>
-                  <CardTitle>Document Upload</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className={cn(
-                      'border-2 border-dashed rounded-xl p-8 text-center transition-colors',
-                      isDragging ? 'border-primary-accent bg-primary-accent/5' : 'border-border hover:border-primary-accent/50'
+              <FadeIn>
+                <Card padding="lg">
+                  <CardHeader>
+                    <CardTitle>Document Upload</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <motion.div
+                      className={cn(
+                        'border-2 border-dashed rounded-xl p-8 text-center transition-colors',
+                        isDragging ? 'border-primary-accent bg-primary-accent/5' : 'border-border hover:border-primary-accent/50'
+                      )}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={openFileDialog}
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Drop zone for document upload"
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      transition={{ duration: 0.15 }}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept={allowedFileTypes.join(',')}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        aria-hidden="true"
+                      />
+                      <Upload className="w-12 h-12 mx-auto text-muted-text mb-4" />
+                      <p className="text-lg font-medium text-text mb-1">Drag & drop document here</p>
+                      <p className="text-sm text-muted-text mb-4">or click to browse</p>
+                      <p className="text-xs text-muted-text">Supported: PNG, JPG, JPEG, PDF • Max 10MB</p>
+                    </motion.div>
+
+                    {errors && Object.keys(errors).length > 0 && (
+                      <FadeIn delay={0.1} y={8}>
+                        <div className="mt-4 p-4 bg-danger/10 border border-danger/20 rounded-lg">
+                          <h4 className="font-medium text-danger mb-2">Upload Errors</h4>
+                          <ul className="space-y-1 text-sm">
+                            {Object.entries(errors).map(([fileName, error]) => (
+                              <li key={fileName} className="text-danger flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                                <span>{fileName}: {error}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </FadeIn>
                     )}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    onClick={openFileDialog}
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Drop zone for document upload"
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={allowedFileTypes.join(',')}
-                      onChange={handleFileSelect}
-                      className="hidden"
-                      aria-hidden="true"
-                    />
-                    <Upload className="w-12 h-12 mx-auto text-muted-text mb-4" />
-                    <p className="text-lg font-medium text-text mb-1">Drag & drop document here</p>
-                    <p className="text-sm text-muted-text mb-4">or click to browse</p>
-                    <p className="text-xs text-muted-text">Supported: PNG, JPG, JPEG, PDF • Max 10MB</p>
-                  </div>
 
-                  {errors && Object.keys(errors).length > 0 && (
-                    <div className="mt-4 p-4 bg-danger/10 border border-danger/20 rounded-lg">
-                      <h4 className="font-medium text-danger mb-2">Upload Errors</h4>
-                      <ul className="space-y-1 text-sm">
-                        {Object.entries(errors).map(([fileName, error]) => (
-                          <li key={fileName} className="text-danger flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                            <span>{fileName}: {error}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                    {(files.length > 0 || uploadedDocuments.length > 0) && (
+                      <FadeIn delay={0.1} y={8}>
+                        <div className="mt-6 space-y-3">
+                          <h4 className="font-medium text-text">Uploaded Documents</h4>
+                          <StaggerContainer staggerChildren={0.05}>
+                            <div className="space-y-2">
+                              {files.map((file, index) => (
+                                <FadeIn key={index} y={4}>
+                                  <div className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
+                                    <div className="w-12 h-12 bg-panel rounded-lg flex items-center justify-center flex-shrink-0">
+                                      {file.type.startsWith('image/') ? (
+                                        <Image className="w-6 h-6 text-muted-text" />
+                                      ) : (
+                                        <FileText className="w-6 h-6 text-muted-text" />
+                                      )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-text truncate">{file.name}</p>
+                                      <p className="text-xs text-muted-text">{formatFileSize(file.size)}</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => removeUploadedFile(index)}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </FadeIn>
+                              ))}
+                              {uploadedDocuments.map((doc, index) => (
+                                <FadeIn key={doc.id} y={4}>
+                                  <div className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
+                                    <img src={doc.preview} alt={doc.name} className="w-12 h-12 rounded-lg object-cover" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-text truncate">{doc.name}</p>
+                                      <p className="text-xs text-muted-text">{formatFileSize(doc.size)} • {doc.documentType}</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => removeDocument(doc.id)}>
+                                      <X className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </FadeIn>
+                              ))}
+                            </div>
+                          </StaggerContainer>
+                        </div>
+                      </FadeIn>
+                    )}
 
-                  {(files.length > 0 || uploadedDocuments.length > 0) && (
-                    <div className="mt-6 space-y-3">
-                      <h4 className="font-medium text-text">Uploaded Documents</h4>
-                      <div className="space-y-2">
-                        {files.map((file, index) => (
-                          <div key={index} className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
-                            <div className="w-12 h-12 bg-panel rounded-lg flex items-center justify-center flex-shrink-0">
-                              {file.type.startsWith('image/') ? (
-                                <Image className="w-6 h-6 text-muted-text" />
-                              ) : (
-                                <FileText className="w-6 h-6 text-muted-text" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-text truncate">{file.name}</p>
-                              <p className="text-xs text-muted-text">{formatFileSize(file.size)}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => removeUploadedFile(index)}>
-                              <X className="w-4 h-4" />
-                            </Button>
+                    <FadeIn delay={0.2} y={8}>
+                      <div className="mt-6 pt-6 border-t border-border">
+                        <h4 className="font-medium text-text mb-3">Demo Documents</h4>
+                        <StaggerContainer staggerChildren={0.05}>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {Object.entries(demoDocuments).map(([key, doc]) => (
+                              <FadeIn key={key} y={4}>
+                                <motion.button
+                                  onClick={() => {
+                                    const url = doc.preview;
+                                    fetch(url)
+                                      .then(res => res.blob())
+                                      .then(blob => {
+                                        const file = new File([blob], doc.name, { type: doc.type });
+                                        addFiles([file]);
+                                      });
+                                  }}
+                                  className="flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border border-border hover:border-primary-accent/50 transition-colors text-left"
+                                  whileHover={{ x: 4 }}
+                                  whileTap={{ scale: 0.98 }}
+                                >
+                                  <img src={doc.preview} alt={doc.name} className="w-10 h-10 rounded-lg object-cover" />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-text truncate">{doc.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')}</p>
+                                    <p className="text-xs text-muted-text">Demo • {formatFileSize(doc.size)}</p>
+                                  </div>
+                                  <ArrowRight className="w-4 h-4 text-muted-text" />
+                                  </motion.button>
+                                </FadeIn>
+                            ))}
                           </div>
-                        ))}
-                        {uploadedDocuments.map((doc, index) => (
-                          <div key={doc.id} className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
-                            <img src={doc.preview} alt={doc.name} className="w-12 h-12 rounded-lg object-cover" />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-text truncate">{doc.name}</p>
-                              <p className="text-xs text-muted-text">{formatFileSize(doc.size)} • {doc.documentType}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => removeDocument(doc.id)}>
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
+                        </StaggerContainer>
                       </div>
-                    </div>
-                  )}
-
-                  <div className="mt-6 pt-6 border-t border-border">
-                    <h4 className="font-medium text-text mb-3">Demo Documents</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {Object.entries(demoDocuments).map(([key, doc]) => (
-                        <button
-                          key={key}
-                          onClick={() => {
-                            const url = doc.preview;
-                            fetch(url)
-                              .then(res => res.blob())
-                              .then(blob => {
-                                const file = new File([blob], doc.name, { type: doc.type });
-                                addFiles([file]);
-                              });
-                          }}
-                          className="flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border border-border hover:border-primary-accent/50 transition-colors text-left"
-                        >
-                          <img src={doc.preview} alt={doc.name} className="w-10 h-10 rounded-lg object-cover" />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-text truncate">{doc.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')}</p>
-                            <p className="text-xs text-muted-text">Demo • {formatFileSize(doc.size)}</p>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-muted-text" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </FadeIn>
+                  </CardContent>
+                </Card>
+              </FadeIn>
             </TabContent>
 
             <TabContent value="extraction">
-              {extractedData ? (
-                <OCRResultsView data={extractedData} />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
-                  <p>Run screening to extract OCR data</p>
-                </div>
-              )}
+              <FadeIn>
+                {extractedData ? (
+                  <OCRResultsView data={extractedData} />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <p>Run screening to extract OCR data</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
 
             <TabContent value="validation">
-              {validationResults ? (
-                <ValidationResultsView results={validationResults} />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
-                  <p>Run screening to validate document</p>
-                </div>
-              )}
+              <FadeIn>
+                {validationResults ? (
+                  <ValidationResultsView results={validationResults} />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <p>Run screening to validate document</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
 
             <TabContent value="forensics">
-              {tamperingResults ? (
-                <TamperingResultsView results={tamperingResults} />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
-                  <p>Run screening for tampering analysis</p>
-                </div>
-              )}
+              <FadeIn>
+                {tamperingResults ? (
+                  <TamperingResultsView results={tamperingResults} />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <p>Run screening for tampering analysis</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
 
             <TabContent value="face_verification">
-              {faceResults ? (
-                <FaceVerificationView results={faceResults} />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
-                  <p>Run screening for face verification</p>
-                </div>
-              )}
+              <FadeIn>
+                {faceResults ? (
+                  <FaceVerificationView results={faceResults} />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <p>Run screening for face verification</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
 
             <TabContent value="risk_assessment">
-              {riskResult ? (
-                <RiskAssessmentView result={riskResult} />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
-                  <p>Run screening for risk assessment</p>
-                </div>
-              )}
+              <FadeIn>
+                {riskResult ? (
+                  <RiskAssessmentView result={riskResult} />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <p>Run screening for risk assessment</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
 
             <TabContent value="result">
-              {riskResult ? (
-                <FinalResultView
-                  riskResult={riskResult}
-                  extractedData={extractedData}
-                  validationResults={validationResults}
-                  tamperingResults={tamperingResults}
-                  faceResults={faceResults}
-                />
-              ) : (
-                <div className="text-center py-12 text-muted-text">
-                  <CheckCircle className="w-12 h-12 mx-auto mb-4 text-success" />
-                  <p className="text-lg font-medium">Screening Complete</p>
-                  <p className="text-muted-text mt-1">Results will appear here after screening completes</p>
-                </div>
-              )}
+              <FadeIn>
+                {riskResult ? (
+                  <FinalResultView
+                    riskResult={riskResult}
+                    extractedData={extractedData}
+                    validationResults={validationResults}
+                    tamperingResults={tamperingResults}
+                    faceResults={faceResults}
+                  />
+                ) : (
+                  <div className="text-center py-12 text-muted-text">
+                    <CheckCircle className="w-12 h-12 mx-auto mb-4 text-success" />
+                    <p className="text-lg font-medium">Screening Complete</p>
+                    <p className="text-muted-text mt-1">Results will appear here after screening completes</p>
+                  </div>
+                )}
+              </FadeIn>
             </TabContent>
           </Tabs>
         </div>
 
-        <div className="space-y-6">
-          <Card padding="md">
-            <CardHeader>
-              <CardTitle>Screening Progress</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Progress value={progress} max={100} showLabel label={progressMessage} size="lg" />
-              <div className="text-sm text-muted-text">
-                Status: <span className="font-medium text-text capitalize">{screeningStatus.replace('_', ' ')}</span>
-              </div>
-              {error && (
-                <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                  <span>{error}</span>
-                </div>
+        <FadeIn delay={0.2}>
+          <StaggerContainer staggerChildren={0.08} delayChildren={0.1}>
+            <div className="space-y-6">
+              <FadeIn y={8}>
+                <Card padding="md">
+                  <CardHeader>
+                    <CardTitle>Screening Progress</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Progress value={progress} max={100} showLabel label={progressMessage} size="lg" />
+                    <div className="text-sm text-muted-text">
+                      Status: <span className="font-medium text-text capitalize">{screeningStatus.replace('_', ' ')}</span>
+                    </div>
+                    {error && (
+                      <div className="p-3 bg-danger/10 border border-danger/20 rounded-lg text-sm text-danger flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>{error}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </FadeIn>
+
+              <FadeIn y={8}>
+                <Card padding="md">
+                  <CardHeader>
+                    <CardTitle>Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Button
+                      variant="primary"
+                      className="w-full justify-center gap-2"
+                      onClick={handleStartScreening}
+                      disabled={isProcessing || (files.length === 0 && !demoEnabled)}
+                      loading={isProcessing}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                    >
+                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                      {isProcessing ? 'Processing...' : 'Start Screening'}
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-center" onClick={() => setShowDemoModal(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      Load Demo Scenario
+                    </Button>
+                  </CardContent>
+                </Card>
+              </FadeIn>
+
+              {uploadedDocuments.length > 0 && (
+                <FadeIn y={8}>
+                  <Card padding="md">
+                    <CardHeader>
+                      <CardTitle>Document Preview</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ImagePreviewer
+                        documents={uploadedDocuments}
+                        onImageSelect={(doc) => {
+                          if (doc.preview.startsWith('blob:')) {
+                            addDocument(doc);
+                          }
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </FadeIn>
               )}
-            </CardContent>
-          </Card>
-
-          <Card padding="md">
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                variant="primary"
-                className="w-full justify-center gap-2"
-                onClick={handleStartScreening}
-                disabled={isProcessing || (files.length === 0 && !demoEnabled)}
-                loading={isProcessing}
-              >
-                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                {isProcessing ? 'Processing...' : 'Start Screening'}
-              </Button>
-              <Button variant="ghost" className="w-full justify-center" onClick={() => setShowDemoModal(true)}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                Load Demo Scenario
-              </Button>
-            </CardContent>
-          </Card>
-
-          {uploadedDocuments.length > 0 && (
-            <Card padding="md">
-              <CardHeader>
-                <CardTitle>Document Preview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ImagePreviewer
-                  documents={uploadedDocuments}
-                  onImageSelect={(doc) => {
-                    if (doc.preview.startsWith('blob:')) {
-                      addDocument(doc);
-                    }
-                  }}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </div>
+            </div>
+          </StaggerContainer>
+        </FadeIn>
       </div>
+      </FadeIn>
 
       <Modal isOpen={showDemoModal} onClose={() => setShowDemoModal(false)} title="Select Demo Scenario" size="lg">
         <div className="space-y-3">
@@ -862,7 +914,7 @@ function RiskAssessmentView({ result }: { result: any }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="flex flex-col items-center justify-center py-8">
             <div className="relative mb-6">
-              <svg width="160" height="160" className="transform -rotate-90">
+              <motion.svg width="160" height="160" className="transform -rotate-90">
                 <circle
                   cx="80"
                   cy="80"
@@ -871,7 +923,7 @@ function RiskAssessmentView({ result }: { result: any }) {
                   strokeWidth="12"
                   fill="none"
                 />
-                <circle
+                <motion.circle
                   cx="80"
                   cy="80"
                   r="70"
@@ -879,13 +931,14 @@ function RiskAssessmentView({ result }: { result: any }) {
                   strokeWidth="12"
                   fill="none"
                   strokeDasharray={439.8}
-                  strokeDashoffset={439.8 - (result.score / 100) * 439.8}
+                  initial={{ strokeDashoffset: 439.8 }}
+                  animate={{ strokeDashoffset: 439.8 - (result.score / 100) * 439.8 }}
+                  transition={{ duration: 0.8, ease: 'easeOut' }}
                   strokeLinecap="round"
-                  className="transition-all duration-1000 ease-out"
                 />
-              </svg>
+              </motion.svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold text-text">{result.score}</span>
+                <AnimatedNumber value={result.score} maxValue={100} duration={0.8} className="text-4xl font-bold text-text" />
                 <span className="text-muted-text">/ 100</span>
                 <Badge variant={result.level === 'high' ? 'danger' : result.level === 'review' ? 'warning' : 'success'} size="lg" className="mt-2">
                   {result.level.toUpperCase()} RISK
@@ -897,38 +950,44 @@ function RiskAssessmentView({ result }: { result: any }) {
 
           <div>
             <h4 className="font-medium text-text mb-4">Risk Contributors</h4>
-            <div className="space-y-3">
+            <StaggerContainer staggerChildren={0.06}>
               {result.contributors?.map((contributor: any) => (
-                <div key={contributor.id} className="bg-panel-secondary rounded-lg p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-text">{contributor.factor}</span>
-                    <Badge variant={contributor.type === 'positive' ? 'success' : 'danger'} size="sm">
-                      {contributor.type === 'positive' ? '+' : ''}{contributor.impact}
-                    </Badge>
+                <FadeIn key={contributor.id} y={8}>
+                  <div className="bg-panel-secondary rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-text">{contributor.factor}</span>
+                      <Badge variant={contributor.type === 'positive' ? 'success' : 'danger'} size="sm">
+                        {contributor.type === 'positive' ? '+' : ''}{contributor.impact}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-text mb-3">{contributor.description}</p>
+                    <div className="h-2 bg-panel rounded-full overflow-hidden">
+                      <motion.div
+                        className={cn('h-full rounded-full', contributor.type === 'positive' ? 'bg-success' : 'bg-danger')}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.abs(contributor.impact) * 2}%` }}
+                        transition={{ duration: 0.5, ease: 'easeOut', delay: 0.2 }}
+                      />
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-text mb-3">{contributor.description}</p>
-                  <div className="h-2 bg-panel rounded-full overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all duration-500', contributor.type === 'positive' ? 'bg-success' : 'bg-danger')}
-                      style={{ width: `${Math.abs(contributor.impact) * 2}%` }}
-                    />
-                  </div>
-                </div>
+                </FadeIn>
               ))}
-            </div>
+            </StaggerContainer>
           </div>
         </div>
 
         <div className="mt-8 pt-6 border-t border-border">
           <h4 className="font-medium text-text mb-4">Explainable AI — Why was this case flagged?</h4>
-          <div className="space-y-2">
+          <StaggerContainer staggerChildren={0.05}>
             {result.explanation?.map((exp: string, i: number) => (
-              <div key={i} className="flex gap-3 p-3 bg-panel-secondary rounded-lg">
-                <span className="text-primary-accent font-mono">{i + 1}.</span>
-                <p className="text-text flex-1">{exp}</p>
-              </div>
+              <FadeIn key={i} y={4}>
+                <div className="flex gap-3 p-3 bg-panel-secondary rounded-lg">
+                  <span className="text-primary-accent font-mono">{i + 1}.</span>
+                  <p className="text-text flex-1">{exp}</p>
+                </div>
+              </FadeIn>
             ))}
-          </div>
+          </StaggerContainer>
         </div>
       </CardContent>
     </Card>
@@ -945,104 +1004,130 @@ function FinalResultView({
   const riskColor = riskResult.level === 'high' ? '#EF4444' : riskResult.level === 'review' ? '#F59E0B' : '#22C55E';
 
   return (
-    <div className="space-y-6">
-      <Card padding="lg" className="border-2" style={{ borderColor: riskColor }}>
-        <CardContent className="pt-0">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-sm font-medium text-muted-text">SCREENING RESULT</span>
-                <Badge variant={riskResult.level === 'high' ? 'danger' : riskResult.level === 'review' ? 'warning' : 'success'} size="md">
-                  {riskResult.level.toUpperCase()} RISK
-                </Badge>
+    <FadeIn>
+      <div className="space-y-6">
+        <Card padding="lg" className="border-2" style={{ borderColor: riskColor }}>
+          <CardContent className="pt-0">
+            <div className="flex items-start justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium text-muted-text">SCREENING RESULT</span>
+                  <Badge variant={riskResult.level === 'high' ? 'danger' : riskResult.level === 'review' ? 'warning' : 'success'} size="md">
+                    {riskResult.level.toUpperCase()} RISK
+                  </Badge>
+                </div>
+                <p className="text-lg font-mono text-text">Case ID: ID-2026-001</p>
               </div>
-              <p className="text-lg font-mono text-text">Case ID: ID-2026-001</p>
-            </div>
-            <div className="text-right">
-              <div className="text-5xl font-bold" style={{ color: riskColor }}>{riskResult.score}</div>
-              <div className="text-muted-text">/ 100</div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-            {[
-              { label: 'OCR', status: extractedData ? 'completed' : 'pending', icon: FileText },
-              { label: 'Validation', status: validationResults?.overallStatus === 'pass' ? 'pass' : validationResults?.overallStatus === 'fail' ? 'fail' : 'warning', icon: CheckCircle },
-              { label: 'Tampering', status: tamperingResults?.overallStatus === 'clean' ? 'pass' : tamperingResults?.overallStatus === 'suspicious' ? 'warning' : 'fail', icon: AlertCircle },
-              { label: 'Face', status: faceResults?.decision === 'match' ? 'pass' : 'fail', icon: AlertCircle },
-              { label: 'Database', status: 'backend_required', icon: AlertCircle },
-            ].map((item, i) => (
-              <div key={i} className="bg-panel-secondary rounded-lg p-4 text-center">
-                <item.icon className="w-6 h-6 mx-auto mb-2 text-primary-accent" />
-                <p className="font-medium text-text">{item.label}</p>
-                <Badge variant={
-                  item.status === 'completed' || item.status === 'pass' ? 'success' :
-                  item.status === 'warning' ? 'warning' :
-                  item.status === 'fail' ? 'danger' : 'info'
-                } size="sm">{item.status.replace('_', ' ').toUpperCase()}</Badge>
+              <div className="text-right">
+                <AnimatedNumber value={riskResult.score} maxValue={100} duration={0.8} className="text-5xl font-bold" style={{ color: riskColor }} />
+                <div className="text-muted-text">/ 100</div>
               </div>
-            ))}
-          </div>
+            </div>
 
-          <div className={cn('p-4 rounded-lg text-center', riskResult.recommendation === 'clear' ? 'bg-success/20' : riskResult.recommendation === 'secondary_inspection' ? 'bg-warning/20' : 'bg-danger/20')}>
-            <p className="font-medium text-lg">Recommended Action:</p>
-            <p className="text-xl font-bold mt-1" style={{ color: riskColor }}>
-              {riskResult.recommendation.replace('_', ' ').toUpperCase()}
-            </p>
-            <p className="text-sm text-muted-text mt-2">
-              This is an AI-assisted recommendation. Final determination requires human operator review.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card padding="lg">
-        <CardHeader>
-          <CardTitle>Evidence Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="overview" variant="line">
-            <TabsList>
-              {['Overview', 'Original', 'OCR', 'Validation', 'Tampering', 'Face', 'Metadata'].map(tab => (
-                <TabTrigger key={tab.toLowerCase()} value={tab.toLowerCase()}>{tab}</TabTrigger>
-              ))}
-            </TabsList>
-            <TabContent value="overview">
-              <div className="space-y-3">
-                {riskResult.explanation?.map((exp: string, i: number) => (
-                  <div key={i} className="p-3 bg-panel-secondary rounded-lg border border-border/50 flex items-start gap-3">
-                    <span className="text-primary-accent font-mono mt-0.5">{i + 1}.</span>
-                    <p className="text-text flex-1">{exp}</p>
-                  </div>
+            <StaggerContainer staggerChildren={0.06}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                {[
+                  { label: 'OCR', status: extractedData ? 'completed' : 'pending', icon: FileText },
+                  { label: 'Validation', status: validationResults?.overallStatus === 'pass' ? 'pass' : validationResults?.overallStatus === 'fail' ? 'fail' : 'warning', icon: CheckCircle },
+                  { label: 'Tampering', status: tamperingResults?.overallStatus === 'clean' ? 'pass' : tamperingResults?.overallStatus === 'suspicious' ? 'warning' : 'fail', icon: AlertCircle },
+                  { label: 'Face', status: faceResults?.decision === 'match' ? 'pass' : 'fail', icon: AlertCircle },
+                  { label: 'Database', status: 'backend_required', icon: AlertCircle },
+                ].map((item, i) => (
+                  <FadeIn key={i} y={8}>
+                    <div className="bg-panel-secondary rounded-lg p-4 text-center">
+                      <item.icon className="w-6 h-6 mx-auto mb-2 text-primary-accent" />
+                      <p className="font-medium text-text">{item.label}</p>
+                      <Badge variant={
+                        item.status === 'completed' || item.status === 'pass' ? 'success' :
+                        item.status === 'warning' ? 'warning' :
+                        item.status === 'fail' ? 'danger' : 'info'
+                      } size="sm">{item.status.replace('_', ' ').toUpperCase()}</Badge>
+                    </div>
+                  </FadeIn>
                 ))}
               </div>
-            </TabContent>
-            <TabContent value="original">
-              <div className="text-center py-8 text-muted-text">Original document view</div>
-            </TabContent>
-            <TabContent value="ocr">
-              <div className="text-center py-8 text-muted-text">OCR extraction details</div>
-            </TabContent>
-            <TabContent value="validation">
-              <div className="text-center py-8 text-muted-text">Validation checklist</div>
-            </TabContent>
-            <TabContent value="tampering">
-              <div className="text-center py-8 text-muted-text">Forensic analysis details</div>
-            </TabContent>
-            <TabContent value="face">
-              <div className="text-center py-8 text-muted-text">Face verification details</div>
-            </TabContent>
-            <TabContent value="metadata">
-              <div className="text-center py-8 text-muted-text">Document metadata</div>
-            </TabContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            </StaggerContainer>
 
-      <div className="flex gap-3 justify-end">
-        <Button variant="secondary" onClick={() => { window.location.href = '/cases'; }}>Back to Cases</Button>
-        <Button variant="primary" onClick={() => {}}>Generate Report</Button>
+            <FadeIn y={8}>
+              <div className={cn('p-4 rounded-lg text-center', riskResult.recommendation === 'clear' ? 'bg-success/20' : riskResult.recommendation === 'secondary_inspection' ? 'bg-warning/20' : 'bg-danger/20')}>
+                <p className="font-medium text-lg">Recommended Action:</p>
+                <p className="text-xl font-bold mt-1" style={{ color: riskColor }}>
+                  {riskResult.recommendation.replace('_', ' ').toUpperCase()}
+                </p>
+                <p className="text-sm text-muted-text mt-2">
+                  This is an AI-assisted recommendation. Final determination requires human operator review.
+                </p>
+              </div>
+            </FadeIn>
+          </CardContent>
+        </Card>
+
+        <FadeIn delay={0.1} y={16}>
+          <Card padding="lg">
+            <CardHeader>
+              <CardTitle>Evidence Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="overview" variant="line">
+                <TabsList>
+                  {['Overview', 'Original', 'OCR', 'Validation', 'Tampering', 'Face', 'Metadata'].map(tab => (
+                    <TabTrigger key={tab.toLowerCase()} value={tab.toLowerCase()}>{tab}</TabTrigger>
+                  ))}
+                </TabsList>
+                <TabContent value="overview">
+                  <StaggerContainer staggerChildren={0.05}>
+                    {riskResult.explanation?.map((exp: string, i: number) => (
+                      <FadeIn key={i} y={4}>
+                        <div className="p-3 bg-panel-secondary rounded-lg border border-border/50 flex items-start gap-3">
+                          <span className="text-primary-accent font-mono mt-0.5">{i + 1}.</span>
+                          <p className="text-text flex-1">{exp}</p>
+                        </div>
+                      </FadeIn>
+                    ))}
+                  </StaggerContainer>
+                </TabContent>
+                <TabContent value="original">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">Original document view</div>
+                  </FadeIn>
+                </TabContent>
+                <TabContent value="ocr">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">OCR extraction details</div>
+                  </FadeIn>
+                </TabContent>
+                <TabContent value="validation">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">Validation checklist</div>
+                  </FadeIn>
+                </TabContent>
+                <TabContent value="tampering">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">Forensic analysis details</div>
+                  </FadeIn>
+                </TabContent>
+                <TabContent value="face">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">Face verification details</div>
+                  </FadeIn>
+                </TabContent>
+                <TabContent value="metadata">
+                  <FadeIn>
+                    <div className="text-center py-8 text-muted-text">Document metadata</div>
+                  </FadeIn>
+                </TabContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </FadeIn>
+
+        <FadeIn delay={0.2}>
+          <div className="flex gap-3 justify-end">
+            <Button variant="secondary" onClick={() => { window.location.href = '/cases'; }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>Back to Cases</Button>
+            <Button variant="primary" onClick={() => {}} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>Generate Report</Button>
+          </div>
+        </FadeIn>
       </div>
-    </div>
+    </FadeIn>
   );
 }

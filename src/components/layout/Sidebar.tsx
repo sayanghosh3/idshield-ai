@@ -1,5 +1,6 @@
 import { ReactNode, useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
+import { motion } from 'motion/react';
 import {
   LayoutDashboard,
   FilePlus,
@@ -67,8 +68,16 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
         </Button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3 space-y-1" role="navigation" aria-label="Main">
-        <ul className="space-y-1" role="list">
+      <nav className="flex-1 overflow-y-auto p-3 space-y-1 relative" role="navigation" aria-label="Main">
+        {!collapsed && (
+          <motion.div
+            layoutId="active-sidebar-indicator"
+            className="absolute left-0 top-0 w-full h-10 bg-primary-accent/20 rounded-lg pointer-events-none transition-all duration-300"
+            style={{ opacity: 1 }}
+            initial={false}
+          />
+        )}
+        <ul className="space-y-1 relative z-10" role="list">
           {navigation.map(item => {
             const isActive = location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href));
             const Icon = item.icon;
@@ -77,9 +86,9 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
                 <NavLink
                   to={item.href}
                   className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200',
-                    isActive
-                      ? 'bg-primary-accent/20 text-primary-accent'
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative',
+                    isActive && !collapsed
+                      ? 'text-primary-accent'
                       : 'text-muted-text hover:text-text hover:bg-panel-secondary',
                     collapsed && 'justify-center'
                   )}

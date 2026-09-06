@@ -1,7 +1,12 @@
 import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';
+import { motion, HTMLMotionProps } from 'motion/react';
 import { cn } from '../../utils/cn';
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+type MotionButtonProps = Pick<HTMLMotionProps<'button'>, 'whileHover' | 'whileTap' | 'whileFocus' | 'whileDrag' | 'animate' | 'initial' | 'exit' | 'transition'>;
+
+type ButtonRestProps = Omit<HTMLMotionProps<'button'>, 'ref' | 'whileHover' | 'whileTap' | 'whileFocus' | 'whileDrag' | 'animate' | 'initial' | 'exit' | 'transition' | keyof MotionButtonProps | 'children'>;
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, MotionButtonProps {
   variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'warning' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg' | 'xl';
   loading?: boolean;
@@ -9,7 +14,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', disabled, loading, children, ...props }, ref) => {
+  ({ className, variant = 'primary', size = 'md', disabled, loading, children, whileHover, whileTap, ...props }, ref) => {
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed';
     
     const variants = {
@@ -30,11 +35,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     return (
-      <button
+      <motion.button
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
         disabled={disabled || loading}
-        {...props}
+        whileHover={whileHover}
+        whileTap={whileTap}
+        {...(props as ButtonRestProps)}
       >
         {loading && (
           <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -43,7 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           </svg>
         )}
         {children}
-      </button>
+      </motion.button>
     );
   }
 );
