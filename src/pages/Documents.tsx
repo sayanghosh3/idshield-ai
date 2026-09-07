@@ -14,6 +14,7 @@ import { FadeIn, StaggerContainer } from '../components/animations';
 const allDocuments = Object.values(demoDocuments);
 
 export function Documents() {
+  console.log("DOCUMENTS PAGE LOADED");
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');

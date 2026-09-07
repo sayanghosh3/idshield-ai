@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Filter, ChevronDown, Download, FileText } from 'lucide-react';
 import { cn } from '../utils/cn';
@@ -13,6 +13,7 @@ import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore }
 import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function Cases() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [riskFilter, setRiskFilter] = useState<string[]>([]);
@@ -176,7 +177,7 @@ export function Cases() {
               data={filteredCases}
               keyExtractor={row => row.id}
               clickable
-              onRowClick={row => window.location.href = `/cases/${row.id}`}
+              onRowClick={(row) => navigate(`/cases/${row.id}`)}
               striped
             />
           </CardContent>
