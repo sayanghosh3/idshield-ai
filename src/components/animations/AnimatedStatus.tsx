@@ -61,9 +61,9 @@ export function AnimatedStatus({
   children,
   ...props
 }: AnimatedStatusProps) {
-  const variant = statusVariants[status];
-  const Icon = statusIcons[status];
-  const colorClass = statusColors[status];
+  const variant = statusVariants[status] ?? statusVariants.pending;
+  const Icon = statusIcons[status] ?? statusIcons.pending;
+  const colorClass = statusColors[status] ?? statusColors.pending;
 
   return (
     <motion.span
