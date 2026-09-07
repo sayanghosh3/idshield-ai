@@ -11,6 +11,7 @@ import {
   Reports,
   AuditLog,
   Settings,
+  RiskCases,
 } from './pages';
 import { ScreeningProvider } from './hooks/useScreening';
 import { DemoModeProvider } from './hooks/useDemoMode';
@@ -27,6 +28,7 @@ function App() {
               <Route path="screening/result/:caseId" element={<ScreeningResult />} />
               <Route path="cases" element={<Cases />} />
               <Route path="cases/:caseId" element={<CaseDetails />} />
+              <Route path="risk-cases" element={<RiskCases />} />
               <Route path="documents" element={<Documents />} />
               <Route path="face" element={<FaceVerification />} />
               <Route path="reports" element={<Reports />} />

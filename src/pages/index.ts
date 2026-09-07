@@ -8,3 +8,4 @@ export * from './FaceVerification';
 export * from './Reports';
 export * from './AuditLog';
 export * from './Settings';
+export * from './RiskCases';

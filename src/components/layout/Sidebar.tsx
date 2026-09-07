@@ -28,6 +28,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'New Screening', href: '/screening', icon: FilePlus },
   { name: 'Cases', href: '/cases', icon: FolderOpen },
+  { name: 'Risk Cases', href: '/risk-cases', icon: AlertTriangle },
   { name: 'Document Analysis', href: '/documents', icon: Search },
   { name: 'Face Verification', href: '/face', icon: User },
   { name: 'Reports', href: '/reports', icon: History },
