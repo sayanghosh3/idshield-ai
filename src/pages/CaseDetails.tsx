@@ -1,4 +1,5 @@
-import { useParams, Link } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, AlertTriangle, CheckCircle, Shield, AlertCircle } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
@@ -6,13 +7,18 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Tabs, TabsList, TabTrigger, TabContent } from '../components/common/Tabs';
 import { Progress } from '../components/common/Progress';
-import { mockScreeningCases } from '../mocks/screeningData';
-import { mockAuditEvents, mockReports, mockCaseNotes } from '../mocks/cases';
+import { IncompleteCase } from '../components/common/IncompleteCase';
+import { hasCompleteResult, analysisStatuses } from '../utils/screeningStatus';
+import { mockCaseNotes } from '../mocks/cases';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 
 export function CaseDetails() {
   const { caseId } = useParams();
-  const caseData = mockScreeningCases.find(c => c.id === caseId || c.caseNumber === caseId) || mockScreeningCases[0];
+  const navigate = useNavigate();
+  const { cases, auditEvents: mockAuditEvents, reports: mockReports } = useCases();
+  const caseData = cases.find(c => c.id === caseId || c.caseNumber === caseId);
+  if (!caseData || !hasCompleteResult(caseData)) return <IncompleteCase record={caseData} />;
+  const outcomes = analysisStatuses(caseData);
   const auditEvents = mockAuditEvents.filter(e => e.caseId === caseData.id);
   const reports = mockReports.filter(r => r.caseId === caseData.id);
   const notes = mockCaseNotes.filter(n => n.caseId === caseData.id);
@@ -21,7 +27,7 @@ export function CaseDetails() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
@@ -32,7 +38,7 @@ export function CaseDetails() {
             </Badge>
             <Badge variant="info" size="sm">{caseData.riskScore} / 100</Badge>
           </div>
-          <p className="text-muted-text">Subject: {caseData.documents[0]?.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')} • {formatRelativeTime(caseData.createdAt)}</p>
+          <p className="text-muted-text">Subject: {caseData.subjectName} • {formatRelativeTime(caseData.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="secondary">
@@ -231,7 +237,7 @@ export function CaseDetails() {
 
                 <div className="space-y-2">
                   {caseData.validationResult?.checks?.map((check: any) => (
-                    <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border', 
+                    <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                       check.status === 'pass' && 'border-success/30',
                       check.status === 'warning' && 'border-warning/30',
                       check.status === 'fail' && 'border-danger/30',
@@ -260,7 +266,7 @@ export function CaseDetails() {
               <CardContent>
                 <div className="space-y-3 mb-6">
                   {caseData.tamperingResult?.findings?.map((finding: any) => (
-                    <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border', 
+                    <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                       finding.status === 'clean' && 'border-success/30',
                       finding.status === 'suspicious' && 'border-warning/30',
                       finding.status === 'tampered' && 'border-danger/30'
@@ -319,11 +325,11 @@ export function CaseDetails() {
                 </div>
 
                 <div className="bg-panel-secondary rounded-lg p-6 text-center">
-                  <div className="text-5xl font-bold mb-2" style={{ color: caseData.faceResult?.decision === 'match' ? '#22C55E' : '#EF4444' }}>
+                  <div className="text-5xl font-bold mb-2" style={{ color: caseData.faceResult?.decision === 'match' ? '#22C55E' : caseData.faceResult?.decision === 'mismatch' ? '#EF4444' : '#94A3B8' }}>
                     {caseData.faceResult?.similarity?.toFixed(1)}%
                   </div>
-                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : 'danger'} size="lg">
-                    {caseData.faceResult?.decision === 'match' ? 'MATCH' : 'MISMATCH'}
+                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : caseData.faceResult?.decision === 'mismatch' ? 'danger' : 'neutral'} size="lg">
+                    {caseData.faceResult?.decision?.toUpperCase() ?? 'NOT CHECKED'}
                   </Badge>
                   <p className="text-sm text-muted-text mt-2">Threshold: {caseData.faceResult?.threshold}%</p>
                 </div>

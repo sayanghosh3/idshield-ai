@@ -1,3 +1,4 @@
+import { useCases } from '../hooks/useCases';
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -8,11 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
-import { mockCases, caseStatusOptions, riskLevelOptions } from '../mocks/cases';
+import { caseStatusOptions, riskLevelOptions } from '../mocks/cases';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function Cases() {
+  const { listItems: mockCases } = useCases();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -26,7 +28,7 @@ export function Cases() {
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(c => 
+      result = result.filter(c =>
         c.caseNumber.toLowerCase().includes(query) ||
         c.subjectName.toLowerCase().includes(query)
       );
@@ -41,15 +43,15 @@ export function Cases() {
     }
 
     result.sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
+      const aVal = a[sortField] ?? -1;
+      const bVal = b[sortField] ?? -1;
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
 
     return result;
-  }, [searchQuery, statusFilter, riskFilter, sortField, sortDirection]);
+  }, [mockCases, searchQuery, statusFilter, riskFilter, sortField, sortDirection]);
 
   const handleSort = (field: 'createdAt' | 'riskScore' | 'caseNumber') => {
     if (sortField === field) {
@@ -155,7 +157,7 @@ export function Cases() {
                 { key: 'riskScore', header: 'Risk', render: (row) => (
                   <div className="flex items-center gap-2">
                     <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
-                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
+                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : row.riskLevel === 'low' ? 'success' : 'neutral'} size="sm">
                       {getRiskLevelLabel(row.riskLevel)}
                     </Badge>
                   </div>

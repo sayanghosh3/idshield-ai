@@ -1,22 +1,28 @@
-import { useParams, Link } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, FileText, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Tabs, TabsList, TabTrigger, TabContent } from '../components/common/Tabs';
-import { mockScreeningCases } from '../mocks/screeningData';
+import { IncompleteCase } from '../components/common/IncompleteCase';
+import { hasCompleteResult, analysisStatuses } from '../utils/screeningStatus';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 
 export function ScreeningResult() {
   const { caseId } = useParams();
-  const caseData = mockScreeningCases.find(c => c.id === caseId || c.caseNumber === caseId) || mockScreeningCases[0];
+  const navigate = useNavigate();
+  const { cases } = useCases();
+  const caseData = cases.find(c => c.id === caseId || c.caseNumber === caseId);
+  if (!caseData || !hasCompleteResult(caseData)) return <IncompleteCase record={caseData} />;
+  const outcomes = analysisStatuses(caseData);
   const riskColor = caseData.riskLevel === 'high' ? '#EF4444' : caseData.riskLevel === 'review' ? '#F59E0B' : '#22C55E';
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div>
@@ -46,10 +52,10 @@ export function ScreeningResult() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             {[
-              { label: 'OCR', status: 'completed', icon: FileText },
-              { label: 'Validation', status: caseData.validationResult?.overallStatus === 'pass' ? 'pass' : caseData.validationResult?.overallStatus === 'fail' ? 'fail' : 'warning', icon: CheckCircle },
-              { label: 'Tampering', status: caseData.tamperingResult?.overallStatus === 'clean' ? 'pass' : caseData.tamperingResult?.overallStatus === 'suspicious' ? 'warning' : 'fail', icon: AlertTriangle },
-              { label: 'Face', status: caseData.faceResult?.decision === 'match' ? 'pass' : 'fail', icon: Shield },
+              { label: 'OCR', status: outcomes.ocr, icon: FileText },
+              { label: 'Validation', status: outcomes.validation, icon: CheckCircle },
+              { label: 'Tampering', status: outcomes.tampering, icon: AlertTriangle },
+              { label: 'Face', status: outcomes.face, icon: Shield },
               { label: 'Database', status: 'backend_required', icon: Shield },
             ].map((item, i) => (
               <div key={i} className="bg-panel-secondary rounded-lg p-4 text-center">
@@ -121,7 +127,7 @@ export function ScreeningResult() {
             <TabContent value="validation">
               <div className="space-y-2">
                 {caseData.validationResult?.checks?.map((check: any) => (
-                  <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border', 
+                  <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                     check.status === 'pass' && 'border-success/30',
                     check.status === 'warning' && 'border-warning/30',
                     check.status === 'fail' && 'border-danger/30',
@@ -144,7 +150,7 @@ export function ScreeningResult() {
             <TabContent value="tampering">
               <div className="space-y-3">
                 {caseData.tamperingResult?.findings?.map((finding: any) => (
-                  <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border', 
+                  <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                     finding.status === 'clean' && 'border-success/30',
                     finding.status === 'suspicious' && 'border-warning/30',
                     finding.status === 'tampered' && 'border-danger/30'
@@ -158,7 +164,7 @@ export function ScreeningResult() {
                     </div>
                     <p className="text-sm text-muted-text mb-2">{finding.description}</p>
                     <div className="h-2 bg-panel rounded-full overflow-hidden">
-                      <div className={cn('h-full rounded-full', 
+                      <div className={cn('h-full rounded-full',
                         finding.status === 'clean' && 'bg-success',
                         finding.status === 'suspicious' && 'bg-warning',
                         finding.status === 'tampered' && 'bg-danger'
@@ -175,7 +181,7 @@ export function ScreeningResult() {
                   <p className="text-sm text-muted-text">Similarity Score</p>
                 </div>
                 <div className="bg-panel-secondary rounded-lg p-4 text-center">
-                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : 'danger'} size="md">
+                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : caseData.faceResult?.decision === 'mismatch' ? 'danger' : 'neutral'} size="md">
                     {caseData.faceResult?.decision?.toUpperCase()}
                   </Badge>
                   <p className="text-sm text-muted-text mt-1">Decision</p>

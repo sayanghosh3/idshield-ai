@@ -1,26 +1,28 @@
-import { DocumentType, DocumentFile, OCRResult } from './document';
+import type { DocumentType, DocumentFile, OCRResult } from './document';
 
-export type ScreeningStatus = 
-  | 'draft' 
-  | 'uploading' 
-  | 'processing' 
-  | 'ocr' 
-  | 'validation' 
-  | 'tampering' 
-  | 'face_verification' 
-  | 'risk_assessment' 
-  | 'completed' 
-  | 'failed';
+export type ScreeningStatus =
+  | 'draft'
+  | 'uploading'
+  | 'processing'
+  | 'ocr'
+  | 'validation'
+  | 'tampering'
+  | 'face_verification'
+  | 'risk_assessment'
+  | 'completed'
+  | 'failed'
+  | 'incomplete';
 
-export type RiskLevel = 'low' | 'review' | 'high';
+export type RiskLevel = 'low' | 'review' | 'high' | 'unknown';
+export type StepStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
 
-export type ScreeningStep = 
-  | 'upload' 
-  | 'extraction' 
-  | 'validation' 
-  | 'forensics' 
-  | 'face_verification' 
-  | 'risk_assessment' 
+export type ScreeningStep =
+  | 'upload'
+  | 'extraction'
+  | 'validation'
+  | 'forensics'
+  | 'face_verification'
+  | 'risk_assessment'
   | 'result';
 
 export interface ValidationCheck {
@@ -107,7 +109,10 @@ export interface ScreeningCase {
   caseNumber: string;
   status: ScreeningStatus;
   riskLevel: RiskLevel;
-  riskScore: number;
+  riskScore: number | null;
+  subjectName?: string;
+  documentType?: string;
+  stepStatuses?: Record<ScreeningStep, StepStatus>;
   documents: DocumentFile[];
   ocrResult?: OCRResult;
   validationResult?: ValidationResult;

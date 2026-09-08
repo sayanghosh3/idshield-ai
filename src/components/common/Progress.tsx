@@ -12,7 +12,7 @@ interface ProgressProps {
 
 export function Progress({ value, max = 100, className, showLabel = false, label, variant = 'default', size = 'md' }: ProgressProps) {
   const percentage = Math.min(100, Math.max(0, (value / max) * 100));
-  
+
   const variants = {
     default: 'bg-primary-accent',
     success: 'bg-success',
@@ -107,6 +107,7 @@ export function CircularProgress({ value, max = 100, size = 80, strokeWidth = 6,
 }
 
 interface StepProgressProps {
+  statuses?: import('../../types/screening').StepStatus[];
   steps: string[];
   currentStep: number;
   completedSteps?: number[];
@@ -114,7 +115,9 @@ interface StepProgressProps {
   orientation?: 'horizontal' | 'vertical';
 }
 
-export function StepProgress({ steps, currentStep, completedSteps = [], className, orientation = 'horizontal' }: StepProgressProps) {
+export function StepProgress({ steps, currentStep, completedSteps = [], statuses, className, orientation = 'horizontal' }: StepProgressProps) {
+  const completed = (index: number) => statuses ? statuses[index] === 'completed' : completedSteps.includes(index);
+  const processing = (index: number) => statuses ? statuses[index] === 'processing' : index === currentStep;
   return (
     <div className={cn('relative', className)}>
       {orientation === 'horizontal' ? (
@@ -125,14 +128,14 @@ export function StepProgress({ steps, currentStep, completedSteps = [], classNam
                 <div
                   className={cn(
                     'w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all duration-300',
-                    index < currentStep || completedSteps.includes(index)
+                    completed(index)
                       ? 'bg-primary-accent border-primary-accent text-background'
-                      : index === currentStep
+                      : processing(index)
                       ? 'border-primary-accent text-primary-accent bg-panel'
                       : 'border-border text-muted-text bg-panel'
                   )}
                 >
-                  {index < currentStep || completedSteps.includes(index) ? (
+                  {completed(index) ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
@@ -142,13 +145,13 @@ export function StepProgress({ steps, currentStep, completedSteps = [], classNam
                 </div>
               </div>
               <span className={cn('mt-2 text-xs text-center max-w-[80px]', index <= currentStep ? 'text-text font-medium' : 'text-muted-text')}>
-                {step}
+                {step}{statuses ? `: ${statuses[index]}` : ''}
               </span>
               {index < steps.length - 1 && (
                 <div
                   className={cn(
                     'absolute top-4 left-1/2 w-full h-0.5 -translate-x-1/2',
-                    index < currentStep || completedSteps.includes(index)
+                    completed(index)
                       ? 'bg-primary-accent'
                       : 'bg-border'
                   )}
@@ -164,14 +167,14 @@ export function StepProgress({ steps, currentStep, completedSteps = [], classNam
               <div
                 className={cn(
                   'w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all duration-300 flex-shrink-0 mt-0.5',
-                  index < currentStep || completedSteps.includes(index)
+                  completed(index)
                     ? 'bg-primary-accent border-primary-accent text-background'
-                    : index === currentStep
+                    : processing(index)
                     ? 'border-primary-accent text-primary-accent bg-panel'
                     : 'border-border text-muted-text bg-panel'
                 )}
               >
-                {index < currentStep || completedSteps.includes(index) ? (
+                {completed(index) ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>

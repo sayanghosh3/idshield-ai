@@ -1,7 +1,7 @@
-import { 
-  ScreeningCase, 
-  ScreeningStatus, 
-  RiskLevel, 
+import type {
+  ScreeningCase,
+  ScreeningStatus,
+  RiskLevel,
   ScreeningStep,
   ValidationResult,
   ValidationCheck,
@@ -12,7 +12,7 @@ import {
   RiskContributor,
   ScreeningProgress
 } from '../types';
-import { demoDocuments, demoOCRResults } from './documents';
+import { demoDocuments, demoOCRResults } from './documents.ts';
 
 export const demoScenarios = [
   {
@@ -265,12 +265,15 @@ const createRiskResult = (scenarioId: string, riskScore: number, riskLevel: Risk
     contributors,
     explanation,
     recommendation,
-    calculatedAt: new Date(),
+    calculatedAt: new Date('2026-01-15T20:31:24Z'),
   };
 };
 
 export const createDemoCase = (scenarioId: string): ScreeningCase => {
-  const scenario = demoScenarios.find(s => s.id === scenarioId)!;
+  const scenario = demoScenarios.find(s => s.id === scenarioId);
+  if (!scenario) throw new Error('Unknown scenario: ' + scenarioId);
+  const numbers: Record<string, number> = { 'tampered-passport': 1, 'genuine-passport': 2, 'expired-passport': 3, 'face-mismatch': 4, 'cross-mismatch': 5 };
+  const number = numbers[scenarioId];
   const document = demoDocuments[scenario.documentKey];
   const ocrResult = demoOCRResults[scenario.documentKey];
   const validationResult = createValidationResult(scenarioId);
@@ -279,9 +282,12 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
   const riskResult = createRiskResult(scenarioId, scenario.riskScore, scenario.riskLevel);
 
   return {
-    id: `case-${scenarioId}-${Date.now()}`,
-    caseNumber: `ID-2026-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+    id: `case-${number}`,
+    caseNumber: `ID-2026-${String(number).padStart(3, '0')}`,
     status: 'completed' as ScreeningStatus,
+    subjectName: ocrResult.extractedFields.find(field => field.key === 'fullName')?.value ?? 'Unknown',
+    documentType: document.documentType,
+    stepStatuses: { upload: 'completed', extraction: 'completed', validation: 'completed', forensics: 'completed', face_verification: 'completed', risk_assessment: 'completed', result: 'completed' },
     riskLevel: scenario.riskLevel,
     riskScore: scenario.riskScore,
     documents: [document],
@@ -291,9 +297,9 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
     faceResult,
     riskResult,
     currentStep: 'result' as ScreeningStep,
-    createdAt: new Date(Date.now() - Math.random() * 86400000),
-    updatedAt: new Date(),
-    completedAt: new Date(),
+    createdAt: new Date('2026-01-15T20:31:00Z'),
+    updatedAt: new Date('2026-01-15T20:31:24Z'),
+    completedAt: new Date('2026-01-15T20:31:24Z'),
     assignedOperator: 'Security Operator',
     tags: [scenarioId],
   };
@@ -302,13 +308,13 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
 export const mockScreeningCases: ScreeningCase[] = demoScenarios.map(s => createDemoCase(s.id));
 
 export const mockScreeningProgress: ScreeningProgress[] = [
-  { step: 'upload', progress: 100, message: 'Document uploaded successfully', startedAt: new Date(), completedAt: new Date() },
-  { step: 'extraction', progress: 100, message: 'OCR extraction completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'validation', progress: 100, message: 'Document validation completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'forensics', progress: 100, message: 'Tampering analysis completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'face_verification', progress: 100, message: 'Face verification completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'risk_assessment', progress: 100, message: 'Risk score calculated', startedAt: new Date(), completedAt: new Date() },
-  { step: 'result', progress: 100, message: 'Screening result generated', startedAt: new Date(), completedAt: new Date() },
+  { step: 'upload', progress: 100, message: 'Document uploaded successfully', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'extraction', progress: 100, message: 'OCR extraction completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'validation', progress: 100, message: 'Document validation completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'forensics', progress: 100, message: 'Tampering analysis completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'face_verification', progress: 100, message: 'Face verification completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'risk_assessment', progress: 100, message: 'Risk score calculated', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'result', progress: 100, message: 'Screening result generated', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
 ];
 
 export const screeningSteps: { step: ScreeningStep; label: string; number: string }[] = [

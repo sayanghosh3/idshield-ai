@@ -1,10 +1,11 @@
-import { Link } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Minus, Users, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
-import { mockScreeningCases } from '../mocks/screeningData';
+
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 import { StaggerContainer, FadeIn, AnimatedCard } from '../components/animations';
 
@@ -47,9 +48,12 @@ const kpiCards = [
   },
 ];
 
-const recentCases = mockScreeningCases.slice(0, 5);
+
 
 export function Dashboard() {
+  const navigate = useNavigate();
+  const { listItems } = useCases();
+  const recentCases = listItems.slice(0, 5);
   return (
     <div className="space-y-6">
       <FadeIn>
@@ -111,7 +115,7 @@ export function Dashboard() {
                 { key: 'riskScore', header: 'Risk Score', render: (row) => (
                   <div className="flex items-center gap-2">
                     <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
-                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
+                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : row.riskLevel === 'low' ? 'success' : 'neutral'} size="sm">
                       {getRiskLevelLabel(row.riskLevel)}
                     </Badge>
                   </div>
@@ -125,7 +129,7 @@ export function Dashboard() {
               data={recentCases}
               keyExtractor={row => row.id}
               clickable
-              onRowClick={row => window.location.href = `/cases/${row.id}`}
+              onRowClick={row => navigate(`/cases/${row.id}`)}
               striped
             />
           </CardContent>

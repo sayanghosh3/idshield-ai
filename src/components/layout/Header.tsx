@@ -1,3 +1,4 @@
+import { useCases } from '../../hooks/useCases';
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -25,13 +26,10 @@ const mockNotifications = [
   { id: '4', title: 'New screening case ID-2026-013 created', time: '1 hour ago', type: 'info', read: true },
 ];
 
-const mockSearchResults = [
-  { id: 'case-1', type: 'Case', title: 'ID-2026-001', subtitle: 'ALEX KUMAR - Passport', href: '/cases/case-1' },
-  { id: 'case-2', type: 'Case', title: 'ID-2026-004', subtitle: 'MARIA GARCIA - Passport', href: '/cases/case-4' },
-  { id: 'doc-1', type: 'Document', title: 'Passport_ALEX_KUMAR.pdf', subtitle: 'Tampered Passport', href: '/documents/doc-1' },
-];
 
 export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
+  const { listItems } = useCases();
+  const mockSearchResults = listItems.map(record => ({ id: record.id, type: 'Case', title: record.caseNumber, subtitle: record.subjectName + ' - ' + record.documentType, href: '/cases/' + record.id }));
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -44,7 +42,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node) && !(e.target instanceof Element && e.target.closest('#search-results'))) {
         setShowSearchResults(false);
       }
       if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
@@ -59,7 +57,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   }, []);
 
   const filteredResults = searchQuery
-    ? mockSearchResults.filter(r => 
+    ? mockSearchResults.filter(r =>
         r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         r.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
       )
@@ -133,7 +131,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
                     className={cn('px-4 py-3 border-b border-border/50 hover:bg-panel-secondary/50', !notification.read && 'bg-primary-accent/5')}
                   >
                     <div className="flex items-start gap-3">
-                      <div className={cn('w-2 h-2 mt-1.5 rounded-full flex-shrink-0', 
+                      <div className={cn('w-2 h-2 mt-1.5 rounded-full flex-shrink-0',
                         notification.type === 'danger' && 'bg-danger',
                         notification.type === 'warning' && 'bg-warning',
                         notification.type === 'success' && 'bg-success',

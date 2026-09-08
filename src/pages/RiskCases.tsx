@@ -1,55 +1,44 @@
+import { caseWorkflowStatus } from '../utils/screeningStatus';
+import { useCases } from '../hooks/useCases';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
-import { mockCases, caseStatusOptions } from '../mocks/cases';
+import { caseStatusOptions } from '../mocks/cases';
 import { CaseListItem } from '../types/case';
 import { getRiskLevelColor, getRiskLevelLabel, formatScore, formatDateTime } from '../utils/formatters';
 import { FadeIn, StaggerContainer, AnimatedStatus } from '../components/animations';
 
-const riskGroupOrder = { high: 0, review: 1, low: 2 };
+const riskGroupOrder = { high: 0, review: 1, low: 2, unknown: 3 };
 const riskGroupLabels: Record<string, string> = {
   high: 'High Risk',
   review: 'Moderate Risk',
   low: 'Low Risk',
+  unknown: 'Not Assessed',
 };
 
 const riskGroupIcons: Record<string, React.ReactNode> = {
   high: <AlertTriangle className="w-5 h-5 text-danger" />,
   review: <AlertTriangle className="w-5 h-5 text-warning" />,
   low: <AlertTriangle className="w-5 h-5 text-success" />,
+  unknown: <AlertTriangle className="w-5 h-5 text-muted-text" />,
 };
 
-function mapCaseStatusToAnimatedStatus(status: string): 'completed' | 'processing' | 'pending' | 'failed' {
-  switch (status) {
-    case 'closed':
-      return 'completed';
-    case 'archived':
-      return 'completed';
-    case 'under_review':
-      return 'pending';
-    case 'open':
-      return 'pending';
-    case 'escalated':
-      return 'pending';
-    default:
-      return 'pending';
-  }
-}
 
 function getStatusConfig(status: string) {
   return caseStatusOptions.find(s => s.value === status) || { color: '', label: status };
 }
 
 export function RiskCases() {
+  const { listItems: mockCases } = useCases();
   const navigate = useNavigate();
 
   const sortedCases = [...mockCases].sort((a, b) => {
     const groupDiff = riskGroupOrder[a.riskLevel as keyof typeof riskGroupOrder] - riskGroupOrder[b.riskLevel as keyof typeof riskGroupOrder];
     if (groupDiff !== 0) return groupDiff;
-    return b.riskScore - a.riskScore;
+    return (b.riskScore ?? -1) - (a.riskScore ?? -1);
   });
 
   const groupedCases = sortedCases.reduce((acc, caseItem) => {
@@ -59,7 +48,7 @@ export function RiskCases() {
     return acc;
   }, {} as Record<string, CaseListItem[]>);
 
-  const riskGroups = ['high', 'review', 'low'] as const;
+  const riskGroups = ['high', 'review', 'low', 'unknown'] as const;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -98,14 +87,14 @@ export function RiskCases() {
                       { key: 'riskScore', header: 'Risk Score', render: (row) => (
                         <div className="flex items-center gap-2">
                           <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
-                          <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
+                          <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : row.riskLevel === 'low' ? 'success' : 'neutral'} size="sm">
                             {getRiskLevelLabel(row.riskLevel)}
                           </Badge>
                         </div>
                       )},
                       { key: 'status', header: 'Status', render: (row) => {
                         const config = getStatusConfig(row.status);
-                        const animatedStatus = mapCaseStatusToAnimatedStatus(row.status);
+                        const animatedStatus = caseWorkflowStatus(row.status);
                         return (
                           <AnimatedStatus status={animatedStatus} className={config.color}>
                             {config.label || row.status.replace('_', ' ')}

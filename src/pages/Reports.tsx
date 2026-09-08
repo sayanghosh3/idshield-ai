@@ -1,3 +1,5 @@
+import { useCases } from '../hooks/useCases';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FileText, Download, Search, Filter, Calendar, ChevronDown, Eye, AlertCircle } from 'lucide-react';
@@ -7,12 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
-import { mockReports } from '../mocks/cases';
-import { mockScreeningCases } from '../mocks/screeningData';
+
 import { formatRelativeTime, formatDate, getRiskLevelColor, getRiskLevelLabel } from '../utils/formatters';
 import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function Reports() {
+  const { reports: mockReports, cases: mockScreeningCases } = useCases();
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -113,7 +115,7 @@ export function Reports() {
                 { key: 'title', header: 'Report', className: 'font-medium', render: (row) => (
                   <div>
                     <p className="font-medium text-text">{row.title}</p>
-                    <p className="text-xs text-muted-text">{row.caseId}</p>
+                    <Link to={`/cases/${row.caseId}`} className="text-xs text-primary-accent">{mockScreeningCases.find(record => record.id === row.caseId)?.caseNumber ?? row.caseId}</Link>
                   </div>
                 )},
                 { key: 'type', header: 'Type', render: (row) => <Badge variant="info" size="sm">{row.type}</Badge> },
@@ -150,7 +152,7 @@ export function Reports() {
                     <select className="input">
                       <option value="">Select a case...</option>
                       {mockScreeningCases.map(c => (
-                        <option key={c.id} value={c.id}>{c.caseNumber} - {c.documents[0]?.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')}</option>
+                        <option key={c.id} value={c.id}>{c.caseNumber} - {c.subjectName}</option>
                       ))}
                     </select>
                   </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, X, CheckCircle, AlertCircle, Loader2, FileText, Image, Upload, RotateCcw, ZoomIn, ZoomOut, Maximize2, Minimize2, Shield } from 'lucide-react';
@@ -8,23 +8,24 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Progress, StepProgress } from '../components/common/Progress';
 import { Tabs, TabsList, TabTrigger, TabContent } from '../components/common/Tabs';
-import { Modal, ConfirmDialog } from '../components/common/Modal';
-import { useFileUpload, useImagePreview, useImageTransform } from '../hooks/useFileUpload';
+import { Modal } from '../components/common/Modal';
+import { useFileUpload, useImageTransform } from '../hooks/useFileUpload';
 import { useScreening } from '../hooks/useScreening';
 import { useDemoMode } from '../hooks/useDemoMode';
-import { screeningService } from '../services/screeningService';
-import { documentService } from '../services/documentService';
-import { demoDocuments, demoOCRResults, documentTypes, allowedFileTypes, maxFileSize } from '../mocks/documents';
+import { caseRepository } from '../services/caseRepository';
+import { createScreeningRunner, waitForStep, SkippedStep } from '../services/screeningRun';
+import { STEP_ORDER, initialStepStatuses, hasCompleteResult, withoutResults, faceOutcome } from '../utils/screeningStatus';
+import { demoDocuments, allowedFileTypes, maxFileSize } from '../mocks/documents';
 import { screeningSteps, createDemoCase } from '../mocks/screeningData';
-import { ScreeningStep } from '../types';
+import type { ScreeningStep, ScreeningCase } from '../types';
 import { formatFileSize, formatRelativeTime, getRiskLevelLabel } from '../utils/formatters';
 import { FadeIn, StaggerContainer, AnimatedNumber, AnimatedStatus } from '../components/animations';
 
-const STEP_ORDER: readonly ScreeningStep[] = ['upload', 'extraction', 'validation', 'forensics', 'face_verification', 'risk_assessment', 'result'];
 
 export function NewScreening() {
   const navigate: ReturnType<typeof useNavigate> = useNavigate();
   const {
+    currentCase,
     uploadedDocuments,
     extractedData,
     validationResults,
@@ -37,34 +38,32 @@ export function NewScreening() {
     progressMessage,
     error,
     addDocument,
-    removeDocument,
-    setExtractedData,
-    setValidationResults,
-    setTamperingResults,
-    setFaceResults,
-    setRiskResult,
-    setScreeningStatus,
-    setCurrentStep,
-    setProgress,
     setError,
     resetScreening,
     loadDemoScenario,
-    addAuditEvent,
   } = useScreening();
 
   const { enabled: demoEnabled, activeScenario, setActiveScenario, scenarios } = useDemoMode();
   const [activeTab, setActiveTab] = useState('upload');
   const [showDemoModal, setShowDemoModal] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [completedSteps, setCompletedSteps] = useState<ScreeningStep[]>([]);
+  const runner = useRef(createScreeningRunner());
+  const mounted = useRef(false);
+  const running = useRef(false);
+  const stepStatuses = currentCase?.stepStatuses ?? initialStepStatuses();
+  const completedSteps = STEP_ORDER.filter(step => stepStatuses[step] === 'completed');
+
+  useEffect(() => {
+    mounted.current = true;
+    resetScreening();
+    return () => { mounted.current = false; runner.current.cancel(); };
+  }, [resetScreening]);
 
   const {
     files,
     errors,
     isDragging,
     fileInputRef,
-    addFiles,
     removeFile: removeUploadedFile,
     clearFiles,
     handleDragOver,
@@ -74,131 +73,102 @@ export function NewScreening() {
     openFileDialog,
   } = useFileUpload(allowedFileTypes, maxFileSize);
 
-  const currentStepIndex = STEP_ORDER.indexOf(currentStep as ScreeningStep);
-  const isStepCompleted = (step: ScreeningStep) => completedSteps.includes(step) || STEP_ORDER.indexOf(step) < currentStepIndex;
-  const isStepActive = (step: string) => step === currentStep;
+  const currentStepIndex = STEP_ORDER.indexOf(currentStep);
+  const isStepCompleted = (step: ScreeningStep) => stepStatuses[step] === 'completed';
+  const getStepStatus = (step: ScreeningStep) => stepStatuses[step];
 
   const handleDemoSelect = useCallback((scenarioId: string) => {
-    const demoCase = createDemoCase(scenarioId);
+    if (running.current) return;
+    const demoCase = caseRepository.find(createDemoCase(scenarioId).id);
+    if (!demoCase) { setError('Demo case not found'); return; }
+    clearFiles();
     loadDemoScenario(demoCase);
     setActiveScenario(scenarioId);
-    setCompletedSteps([...STEP_ORDER]);
     setActiveTab('result');
     setShowDemoModal(false);
-    addAuditEvent({
-      id: `audit-${Date.now()}`,
-      caseId: demoCase.id,
-      timestamp: new Date(),
-      event: `Demo scenario loaded: ${scenarios.find(s => s.id === scenarioId)?.name}`,
-      category: 'user',
-      status: 'success',
-      actor: 'Security Operator',
-      actorType: 'user',
+    caseRepository.addAudit({
+      id: crypto.randomUUID(), caseId: demoCase.id, timestamp: new Date(),
+      event: 'Demo scenario loaded', category: 'user', status: 'info',
+      actor: 'Security Operator', actorType: 'user',
     });
-  }, [loadDemoScenario, setActiveScenario, scenarios, setCompletedSteps, addAuditEvent]);
+  }, [clearFiles, loadDemoScenario, setActiveScenario, setError]);
 
   const handleStartScreening = useCallback(async () => {
-    if (files.length === 0 && !demoEnabled) {
+    if (running.current) return;
+    const scenario = files.length === 0 ? activeScenario : null;
+    if (!files.length && !scenario) {
       setError('Please upload a document or select a demo scenario');
       return;
     }
-
+    const template = scenario ? createDemoCase(scenario) : null;
+    const identity = crypto.randomUUID();
+    const now = new Date();
+    const record: ScreeningCase = {
+      ...(template ? withoutResults(template) : {}),
+      id: `case-${identity}`, caseNumber: `ID-${now.getFullYear()}-${identity.toUpperCase()}`,
+      subjectName: template?.subjectName ?? 'Not extracted',
+      documentType: template?.documentType ?? 'other',
+      documents: template?.documents ?? files.map((file, index) => ({
+        id: `doc-${identity}-${index}`, name: file.name, type: file.type, size: file.size,
+        preview: '', documentType: 'other' as const, uploadedAt: now,
+      })),
+      status: 'draft', riskLevel: 'unknown', riskScore: null,
+      currentStep: 'upload', stepStatuses: initialStepStatuses(),
+      createdAt: now, updatedAt: now, tags: template ? ['demo'] : ['unassessed'],
+    };
+    running.current = true;
     setIsProcessing(true);
     setError(null);
-    setScreeningStatus('processing');
-    const newSteps: ScreeningStep[] = [];
-
+    setActiveTab('upload');
+    const reported = new Set<string>();
     try {
-      for (const step of STEP_ORDER) {
-        setCurrentStep(step);
-        setProgress(STEP_ORDER.indexOf(step) * 100 / STEP_ORDER.length, `${step.replace('_', ' ').replace(/^\w/, (c: string) => c.toUpperCase())}...`);
-        newSteps.push(step);
-        setCompletedSteps([...newSteps]);
-
-        await new Promise(resolve => setTimeout(resolve, 800));
-
+      const result = await runner.current.run(record, async (step, _record, signal) => {
+        await waitForStep(signal);
+        if (step === 'upload' || step === 'result') return {};
+        if (!template) throw new SkippedStep('Analysis of uploaded files requires a connected backend. No result was generated.');
         switch (step) {
-          case 'extraction':
-            if (demoEnabled && activeScenario) {
-              const demoCase = createDemoCase(activeScenario);
-              setExtractedData(demoCase.ocrResult || null);
-            } else if (files[0]) {
-              const uploadResult = await screeningService.uploadDocument(files[0]);
-              const ocrResult = await documentService.extractOCR(uploadResult.fileId, 'passport');
-              setExtractedData(ocrResult);
-            }
-            break;
-          case 'validation':
-            if (demoEnabled && activeScenario) {
-              const demoCase = createDemoCase(activeScenario);
-              setValidationResults(demoCase.validationResult || null);
-            }
-            break;
-          case 'forensics':
-            if (demoEnabled && activeScenario) {
-              const demoCase = createDemoCase(activeScenario);
-              setTamperingResults(demoCase.tamperingResult || null);
-            }
-            break;
-          case 'face_verification':
-            if (demoEnabled && activeScenario) {
-              const demoCase = createDemoCase(activeScenario);
-              setFaceResults(demoCase.faceResult || null);
-            }
-            break;
-          case 'risk_assessment':
-            if (demoEnabled && activeScenario) {
-              const demoCase = createDemoCase(activeScenario);
-              setRiskResult(demoCase.riskResult || null);
-            }
-            break;
+          case 'extraction': return { ocrResult: template.ocrResult };
+          case 'validation': return { validationResult: template.validationResult };
+          case 'forensics': return { tamperingResult: template.tamperingResult };
+          case 'face_verification': return { faceResult: template.faceResult };
+          case 'risk_assessment': return { riskResult: template.riskResult };
         }
-
-        addAuditEvent({
-          id: `audit-${Date.now()}`,
-          caseId: `temp-${Date.now()}`,
-          timestamp: new Date(),
-          event: `${step.replace('_', ' ').replace(/^\w/, (c: string) => c.toUpperCase())} completed`,
-          category: 'ai',
-          status: 'success',
-          actor: 'AI Engine',
-          actorType: 'api',
-        });
-      }
-
-      setScreeningStatus('completed');
-      setProgress(100, 'Screening completed');
-      setActiveTab('result');
-
-      if (!demoEnabled && files[0]) {
-        const caseResult = await screeningService.createCase(
-          files.map(f => f.name),
-          files[0]?.type || 'passport'
-        );
-        navigate(`/screening/result/${caseResult.id}`);
+      }, update => {
+        caseRepository.upsert(update);
+        for (const step of STEP_ORDER) {
+          const status = update.stepStatuses![step];
+          const key = `${step}:${status}`;
+          if (!['completed', 'failed', 'skipped'].includes(status) || reported.has(key)) continue;
+          reported.add(key);
+          caseRepository.addAudit({
+            id: crypto.randomUUID(), caseId: update.id, timestamp: new Date(),
+            event: `${step.replaceAll('_', ' ')} ${status}`,
+            category: 'system', status: status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'warning',
+            actor: template ? 'Demo Engine' : 'Screening Engine', actorType: 'system',
+          });
+        }
+        if (mounted.current) loadDemoScenario(update);
+      });
+      if (mounted.current) {
+        setActiveTab('result');
+        if (result.status === 'incomplete') setError('Screening cancelled. No final result is available.');
       }
     } catch (err) {
-      setError('Screening failed. Please try again.');
-      setScreeningStatus('failed');
+      if (mounted.current) setError(err instanceof Error ? err.message : 'Screening failed. Please try again.');
     } finally {
-      setIsProcessing(false);
+      running.current = false;
+      if (mounted.current) setIsProcessing(false);
     }
-  }, [files, demoEnabled, activeScenario, setCurrentStep, setProgress, setCompletedSteps, setExtractedData, setValidationResults, setTamperingResults, setFaceResults, setRiskResult, setScreeningStatus, setError, setActiveTab, navigate, addAuditEvent, screeningService, documentService, files]);
+  }, [files, activeScenario, loadDemoScenario, setError]);
 
   const handleReset = useCallback(() => {
+    runner.current.cancel();
     resetScreening();
     clearFiles();
-    setCompletedSteps([]);
     setActiveTab('upload');
     setActiveScenario(null);
     setError(null);
-  }, [resetScreening, clearFiles, setCompletedSteps, setActiveTab, setActiveScenario, setError]);
-
-  const getStepStatus = (step: string) => {
-    if (isStepCompleted(step as ScreeningStep)) return 'completed';
-    if (isStepActive(step)) return 'active';
-    return 'pending';
-  };
+  }, [resetScreening, clearFiles, setActiveScenario, setError]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -220,7 +190,7 @@ export function NewScreening() {
                 {scenarios.find(s => s.id === activeScenario)?.name}
               </Badge>
             )}
-            <Button variant="ghost" onClick={() => setShowDemoModal(true)}>
+            <Button variant="ghost" disabled={isProcessing} onClick={() => setShowDemoModal(true)}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
               Demo Scenarios
             </Button>
@@ -237,6 +207,7 @@ export function NewScreening() {
           steps={screeningSteps.map(s => s.label)}
           currentStep={currentStepIndex}
           completedSteps={completedSteps.map(s => STEP_ORDER.indexOf(s))}
+          statuses={STEP_ORDER.map(step => stepStatuses[step])}
           className="mb-6"
         />
       </FadeIn>
@@ -256,12 +227,12 @@ export function NewScreening() {
                       className={cn(
                         'py-2 px-3 text-xs font-medium transition-all duration-200',
                         status === 'completed' && 'bg-success text-white',
-                        status === 'active' && 'bg-primary-accent text-background',
+                        status === 'processing' && 'bg-primary-accent text-background',
                         status === 'pending' && 'text-muted-text'
                       )}
                     >
                       <div className="flex items-center justify-center gap-1.5">
-                        <AnimatedStatus status={status as 'completed' | 'processing' | 'pending' | 'failed'} />
+                        <AnimatedStatus status={status} />
                         <span className="hidden sm:inline">{step.label}</span>
                       </div>
                     </TabTrigger>
@@ -283,8 +254,8 @@ export function NewScreening() {
                       )}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
-                      onDrop={handleDrop}
-                      onClick={openFileDialog}
+                      onDrop={event => { if (running.current) event.preventDefault(); else { resetScreening(); setActiveScenario(null); setActiveTab('upload'); handleDrop(event); } }}
+                      onClick={() => { if (!running.current) { resetScreening(); setActiveScenario(null); setActiveTab('upload'); openFileDialog(); } }}
                       role="button"
                       tabIndex={0}
                       aria-label="Drop zone for document upload"
@@ -296,7 +267,7 @@ export function NewScreening() {
                         ref={fileInputRef}
                         type="file"
                         accept={allowedFileTypes.join(',')}
-                        onChange={handleFileSelect}
+                        onChange={event => { if (!running.current) handleFileSelect(event); }}
                         className="hidden"
                         aria-hidden="true"
                       />
@@ -342,13 +313,13 @@ export function NewScreening() {
                                       <p className="font-medium text-text truncate">{file.name}</p>
                                       <p className="text-xs text-muted-text">{formatFileSize(file.size)}</p>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => removeUploadedFile(index)}>
+                                    <Button variant="ghost" size="sm" disabled={isProcessing} onClick={() => { resetScreening(); removeUploadedFile(index); }}>
                                       <X className="w-4 h-4" />
                                     </Button>
                                   </div>
                                 </FadeIn>
                               ))}
-                              {uploadedDocuments.map((doc, index) => (
+                              {files.length === 0 && uploadedDocuments.map(doc => (
                                 <FadeIn key={doc.id} y={4}>
                                   <div className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
                                     <img src={doc.preview} alt={doc.name} className="w-12 h-12 rounded-lg object-cover" />
@@ -356,7 +327,7 @@ export function NewScreening() {
                                       <p className="font-medium text-text truncate">{doc.name}</p>
                                       <p className="text-xs text-muted-text">{formatFileSize(doc.size)} • {doc.documentType}</p>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => removeDocument(doc.id)}>
+                                    <Button variant="ghost" size="sm" disabled={isProcessing} onClick={() => { handleReset(); }}>
                                       <X className="w-4 h-4" />
                                     </Button>
                                   </div>
@@ -376,15 +347,8 @@ export function NewScreening() {
                             {Object.entries(demoDocuments).map(([key, doc]) => (
                               <FadeIn key={key} y={4}>
                                 <motion.button
-                                  onClick={() => {
-                                    const url = doc.preview;
-                                    fetch(url)
-                                      .then(res => res.blob())
-                                      .then(blob => {
-                                        const file = new File([blob], doc.name, { type: doc.type });
-                                        addFiles([file]);
-                                      });
-                                  }}
+                                  onClick={() => handleDemoSelect(key)}
+                                  disabled={isProcessing}
                                   className="flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border border-border hover:border-primary-accent/50 transition-colors text-left"
                                   whileHover={{ x: 4 }}
                                   whileTap={{ scale: 0.98 }}
@@ -413,7 +377,7 @@ export function NewScreening() {
                   <OCRResultsView data={extractedData} />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <AnimatedStatus status={stepStatuses.extraction}>{stepStatuses.extraction}</AnimatedStatus>
                     <p>Run screening to extract OCR data</p>
                   </div>
                 )}
@@ -426,7 +390,7 @@ export function NewScreening() {
                   <ValidationResultsView results={validationResults} />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <AnimatedStatus status={stepStatuses.validation}>{stepStatuses.validation}</AnimatedStatus>
                     <p>Run screening to validate document</p>
                   </div>
                 )}
@@ -439,7 +403,7 @@ export function NewScreening() {
                   <TamperingResultsView results={tamperingResults} />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <AnimatedStatus status={stepStatuses.forensics}>{stepStatuses.forensics}</AnimatedStatus>
                     <p>Run screening for tampering analysis</p>
                   </div>
                 )}
@@ -452,7 +416,7 @@ export function NewScreening() {
                   <FaceVerificationView results={faceResults} />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <AnimatedStatus status={stepStatuses.face_verification}>{stepStatuses.face_verification}</AnimatedStatus>
                     <p>Run screening for face verification</p>
                   </div>
                 )}
@@ -465,7 +429,7 @@ export function NewScreening() {
                   <RiskAssessmentView result={riskResult} />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <Loader2 className="w-12 h-12 mx-auto animate-spin mb-4 text-primary-accent" />
+                    <AnimatedStatus status={stepStatuses.risk_assessment}>{stepStatuses.risk_assessment}</AnimatedStatus>
                     <p>Run screening for risk assessment</p>
                   </div>
                 )}
@@ -474,8 +438,8 @@ export function NewScreening() {
 
             <TabContent value="result">
               <FadeIn>
-                {riskResult ? (
-                  <FinalResultView
+                {currentCase && hasCompleteResult(currentCase) && riskResult ? (
+                  <FinalResultView caseId={currentCase!.id} caseNumber={currentCase!.caseNumber}
                     riskResult={riskResult}
                     extractedData={extractedData}
                     validationResults={validationResults}
@@ -484,8 +448,8 @@ export function NewScreening() {
                   />
                 ) : (
                   <div className="text-center py-12 text-muted-text">
-                    <CheckCircle className="w-12 h-12 mx-auto mb-4 text-success" />
-                    <p className="text-lg font-medium">Screening Complete</p>
+                    <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-text" />
+                    <p className="text-lg font-medium">No final result available</p>
                     <p className="text-muted-text mt-1">Results will appear here after screening completes</p>
                   </div>
                 )}
@@ -523,11 +487,12 @@ export function NewScreening() {
                     <CardTitle>Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {isProcessing && <Button variant="secondary" onClick={() => runner.current.cancel()}>Cancel Screening</Button>}
                     <Button
                       variant="primary"
                       className="w-full justify-center gap-2"
                       onClick={handleStartScreening}
-                      disabled={isProcessing || (files.length === 0 && !demoEnabled)}
+                      disabled={isProcessing || (files.length === 0 && !activeScenario)}
                       loading={isProcessing}
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
@@ -535,7 +500,7 @@ export function NewScreening() {
                       {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
                       {isProcessing ? 'Processing...' : 'Start Screening'}
                     </Button>
-                    <Button variant="ghost" className="w-full justify-center" onClick={() => setShowDemoModal(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+                    <Button variant="ghost" className="w-full justify-center" disabled={isProcessing} onClick={() => setShowDemoModal(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                       Load Demo Scenario
                     </Button>
@@ -550,7 +515,7 @@ export function NewScreening() {
                       <CardTitle>Document Preview</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <ImagePreviewer
+                      <ImagePreviewer key={currentCase?.id ?? 'upload'}
                         documents={uploadedDocuments}
                         onImageSelect={(doc) => {
                           if (doc.preview.startsWith('blob:')) {
@@ -596,15 +561,6 @@ export function NewScreening() {
         </div>
       </Modal>
 
-      <ConfirmDialog
-        isOpen={showResetConfirm}
-        onClose={() => setShowResetConfirm(false)}
-        onConfirm={handleReset}
-        title="Reset Screening"
-        message="This will clear all uploaded documents and screening progress. Are you sure?"
-        confirmText="Reset"
-        variant="danger"
-      />
     </div>
   );
 }
@@ -736,7 +692,7 @@ function ValidationResultsView({ results }: { results: any }) {
           {results.checks?.map((check: any) => (
             <div
               key={check.id}
-              className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border', 
+              className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                 check.status === 'pass' && 'border-success/30',
                 check.status === 'warning' && 'border-warning/30',
                 check.status === 'fail' && 'border-danger/30',
@@ -787,7 +743,7 @@ function TamperingResultsView({ results }: { results: any }) {
             <h4 className="font-medium text-text mb-3">Analysis Results</h4>
             <div className="space-y-3 mb-6">
               {results.findings?.map((finding: any) => (
-                <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border', 
+                <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                   finding.status === 'clean' && 'border-success/30',
                   finding.status === 'suspicious' && 'border-warning/30',
                   finding.status === 'tampered' && 'border-danger/30'
@@ -868,11 +824,11 @@ function FaceVerificationView({ results }: { results: any }) {
         </div>
 
         <div className="bg-panel-secondary rounded-lg p-6 text-center">
-          <div className="text-5xl font-bold mb-2" style={{ color: results.decision === 'match' ? '#22C55E' : '#EF4444' }}>
+          <div className="text-5xl font-bold mb-2" style={{ color: results.decision === 'match' ? '#22C55E' : results.decision === 'mismatch' ? '#EF4444' : '#94A3B8' }}>
             {results.similarity.toFixed(1)}%
           </div>
-          <Badge variant={results.decision === 'match' ? 'success' : 'danger'} size="lg">
-            {results.decision === 'match' ? 'MATCH' : 'MISMATCH'}
+          <Badge variant={results.decision === 'match' ? 'success' : results.decision === 'mismatch' ? 'danger' : 'neutral'} size="lg">
+            {results.decision?.toUpperCase() ?? 'NOT CHECKED'}
           </Badge>
           <p className="text-sm text-muted-text mt-2">Threshold: {results.threshold}%</p>
         </div>
@@ -891,7 +847,7 @@ function FaceVerificationView({ results }: { results: any }) {
             <p className="text-sm text-muted-text">Similarity Score</p>
           </div>
           <div className="bg-panel-secondary rounded-lg p-4 text-center">
-            <Badge variant={results.decision === 'match' ? 'success' : 'danger'} size="md">
+            <Badge variant={results.decision === 'match' ? 'success' : results.decision === 'mismatch' ? 'danger' : 'neutral'} size="md">
               {results.decision.toUpperCase()}
             </Badge>
             <p className="text-sm text-muted-text mt-1">Decision</p>
@@ -995,12 +951,15 @@ function RiskAssessmentView({ result }: { result: any }) {
 }
 
 function FinalResultView({
+  caseId,
+  caseNumber,
   riskResult,
   extractedData,
   validationResults,
   tamperingResults,
   faceResults,
-}: { riskResult: any; extractedData: any; validationResults: any; tamperingResults: any; faceResults: any }) {
+}: { caseId: string; caseNumber: string; riskResult: any; extractedData: any; validationResults: any; tamperingResults: any; faceResults: any }) {
+  const navigate = useNavigate();
   const riskColor = riskResult.level === 'high' ? '#EF4444' : riskResult.level === 'review' ? '#F59E0B' : '#22C55E';
 
   return (
@@ -1016,7 +975,7 @@ function FinalResultView({
                     {riskResult.level.toUpperCase()} RISK
                   </Badge>
                 </div>
-                <p className="text-lg font-mono text-text">Case ID: ID-2026-001</p>
+                <p className="text-lg font-mono text-text">Case ID: {caseNumber}</p>
               </div>
               <div className="text-right">
                 <AnimatedNumber value={riskResult.score} maxValue={100} duration={0.8} className="text-5xl font-bold" style={{ color: riskColor }} />
@@ -1030,7 +989,7 @@ function FinalResultView({
                   { label: 'OCR', status: extractedData ? 'completed' : 'pending', icon: FileText },
                   { label: 'Validation', status: validationResults?.overallStatus === 'pass' ? 'pass' : validationResults?.overallStatus === 'fail' ? 'fail' : 'warning', icon: CheckCircle },
                   { label: 'Tampering', status: tamperingResults?.overallStatus === 'clean' ? 'pass' : tamperingResults?.overallStatus === 'suspicious' ? 'warning' : 'fail', icon: AlertCircle },
-                  { label: 'Face', status: faceResults?.decision === 'match' ? 'pass' : 'fail', icon: AlertCircle },
+                  { label: 'Face', status: faceOutcome(faceResults), icon: AlertCircle },
                   { label: 'Database', status: 'backend_required', icon: AlertCircle },
                 ].map((item, i) => (
                   <FadeIn key={i} y={8}>
@@ -1123,8 +1082,8 @@ function FinalResultView({
 
         <FadeIn delay={0.2}>
           <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => { window.location.href = '/cases'; }} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>Back to Cases</Button>
-            <Button variant="primary" onClick={() => {}} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>Generate Report</Button>
+            <Button variant="secondary" onClick={() => navigate('/cases')} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>Back to Cases</Button>
+            <Button variant="primary" onClick={() => navigate(`/cases/${caseId}`)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>View Case Details</Button>
           </div>
         </FadeIn>
       </div>

@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
 import { useState, useMemo } from 'react';
 import { Search, Filter, Download, Calendar, ChevronDown, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -7,11 +9,12 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
-import { mockAuditEvents } from '../mocks/cases';
+
 import { formatDateTime, formatRelativeTime } from '../utils/formatters';
 import { FadeIn, StaggerContainer } from '../components/animations';
 
 export function AuditLog() {
+  const { auditEvents: mockAuditEvents, cases } = useCases();
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -27,7 +30,7 @@ export function AuditLog() {
         const query = searchQuery.toLowerCase();
         if (!event.event.toLowerCase().includes(query) &&
             !event.actor.toLowerCase().includes(query) &&
-            !JSON.stringify(event.details).toLowerCase().includes(query)) {
+            !JSON.stringify(event.details ?? {}).toLowerCase().includes(query)) {
           return false;
         }
       }
@@ -35,7 +38,7 @@ export function AuditLog() {
       if (statusFilter.length > 0 && !statusFilter.includes(event.status)) return false;
       return true;
     });
-  }, [searchQuery, categoryFilter, statusFilter]);
+  }, [mockAuditEvents, searchQuery, categoryFilter, statusFilter]);
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -166,6 +169,7 @@ export function AuditLog() {
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-text">{event.actor} ({event.actorType})</p>
+                        <Link className="text-xs text-primary-accent" onClick={e => e.stopPropagation()} to={`/cases/${event.caseId}`}>{cases.find(record => record.id === event.caseId)?.caseNumber ?? event.caseId}</Link>
                         {event.details && (
                           <p className="text-xs text-muted-text mt-1 font-mono max-w-2xl truncate">
                             {JSON.stringify(event.details)}
