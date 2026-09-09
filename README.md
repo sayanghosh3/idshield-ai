@@ -327,3 +327,10 @@ This is a hackathon prototype. For production use:
 ---
 
 **Built with ❤️ for SIH 2026**
+
+# Confidential document security
+
+The frontend remains **DEMO / SIMULATED**. A separate development-only server
+scaffold now provides tested security controls; uploads are blocked until document
+inspection and malware scanning are configured. See [server/README.md](server/README.md)
+for the API contract, setup, real-versus-development matrix and production gaps.
