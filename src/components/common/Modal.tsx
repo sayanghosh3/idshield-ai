@@ -1,4 +1,4 @@
-import { Fragment, ReactNode, useEffect, useCallback } from 'react';
+import { ReactNode, useEffect, useRef, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X } from 'lucide-react';
@@ -28,22 +28,40 @@ export function Modal({
   closeOnOverlayClick = true,
   closeOnEscape = true,
 }: ModalProps) {
-  const handleEscape = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && closeOnEscape) {
-      onClose();
-    }
-  }, [closeOnEscape, onClose]);
-
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
+  const titleId = useId();
+  const descriptionId = useId();
   useEffect(() => {
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+    if (!isOpen) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const focusable = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+    ) ?? []).filter(element => element.getClientRects().length > 0);
+    const frame = requestAnimationFrame(() => (focusable()[0] ?? dialogRef.current)?.focus());
+    function handleKey(event: KeyboardEvent) {
+      if (event.key === 'Escape' && closeOnEscape) { event.preventDefault(); closeRef.current(); }
+      if (event.key !== 'Tab') return;
+      const items = focusable();
+      const first = items[0], last = items.at(-1);
+      if (!first) { event.preventDefault(); dialogRef.current?.focus(); return; }
+      if (event.shiftKey && (document.activeElement === first || !dialogRef.current?.contains(document.activeElement))) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialogRef.current?.contains(document.activeElement))) {
+        event.preventDefault(); first.focus();
+      }
     }
+    document.addEventListener('keydown', handleKey);
     return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
     };
-  }, [isOpen, handleEscape]);
+  }, [isOpen, closeOnEscape]);
 
   const sizes = {
     sm: 'max-w-md',
@@ -58,10 +76,12 @@ export function Modal({
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 overflow-y-auto"
+          ref={dialogRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
-          aria-labelledby={title ? 'modal-title' : undefined}
-          aria-describedby={description ? 'modal-description' : undefined}
+          aria-labelledby={title ? titleId : undefined}
+          aria-describedby={description ? descriptionId : undefined}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -87,8 +107,8 @@ export function Modal({
               {(title || showCloseButton) && (
                 <div className="flex items-start justify-between p-6 border-b border-border/50">
                   <div>
-                    {title && <h2 id="modal-title" className="text-lg font-semibold text-text">{title}</h2>}
-                    {description && <p id="modal-description" className="mt-1 text-sm text-muted-text">{description}</p>}
+                    {title && <h2 id={titleId} className="text-lg font-semibold text-text">{title}</h2>}
+                    {description && <p id={descriptionId} className="mt-1 text-sm text-muted-text">{description}</p>}
                   </div>
                   {showCloseButton && (
                     <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close modal" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>

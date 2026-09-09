@@ -4,19 +4,14 @@ import { Link } from 'react-router-dom';
 import {
   Search,
   Bell,
-  Sun,
-  Moon,
   User,
   LogOut,
-  AlertTriangle,
   Shield,
   ChevronDown,
-  X,
   Settings,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { Button } from '../common';
-import { Modal } from '../common/Modal';
 import { useDemoMode } from '../../hooks/useDemoMode';
 
 const mockNotifications = [
@@ -27,7 +22,7 @@ const mockNotifications = [
 ];
 
 
-export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
+export function Header({ collapsed, onToggleSidebar }: { collapsed: boolean; onToggleSidebar: () => void }) {
   const { listItems } = useCases();
   const mockSearchResults = listItems.map(record => ({ id: record.id, type: 'Case', title: record.caseNumber, subtitle: record.subjectName + ' - ' + record.documentType, href: '/cases/' + record.id }));
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +59,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
     : [];
 
   return (
-    <header className="fixed top-0 left-16 right-0 z-30 h-16 bg-panel/95 backdrop-blur-sm border-b border-border flex items-center justify-between px-6 transition-all duration-300">
+    <header className={cn('fixed top-0 left-0 right-0 z-30 h-16 bg-panel/95 backdrop-blur-sm border-b border-border flex items-center justify-between px-3 sm:px-6 transition-all duration-300', collapsed ? 'lg:left-16' : 'lg:left-64')}>
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={onToggleSidebar} aria-label="Toggle sidebar" className="lg:hidden">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,7 +75,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
             value={searchQuery}
             onChange={e => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
             onFocus={() => searchQuery && setShowSearchResults(true)}
-            className="bg-transparent border-none outline-none text-text placeholder-muted-text text-sm w-64"
+            className="bg-transparent border-none outline-none text-text placeholder-muted-text text-sm w-32 xl:w-64"
             aria-label="Global search"
             aria-expanded={showSearchResults}
             aria-controls="search-results"
@@ -116,13 +111,13 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
         <div className="relative" ref={notificationsRef}>
           <Button variant="ghost" size="sm" onClick={() => setShowNotifications(!showNotifications)} aria-label="Notifications" aria-expanded={showNotifications}>
             <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger text-[10px] font-bold rounded-full flex items-center justify-center">3</span>
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-danger text-[10px] font-bold rounded-full flex items-center justify-center">{mockNotifications.filter(item => !item.read).length}</span>
           </Button>
           {showNotifications && (
-            <div className="absolute right-0 top-full mt-2 w-80 bg-panel border border-border rounded-xl shadow-lg overflow-hidden">
+            <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-2rem)] bg-panel border border-border rounded-xl shadow-lg overflow-hidden">
               <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-                <h3 className="font-semibold text-text">Notifications</h3>
-                <Button variant="ghost" size="sm" onClick={() => {}}>Mark all read</Button>
+                <h3 className="font-semibold text-text">Sample notifications</h3>
+
               </div>
               <div className="max-h-96 overflow-y-auto">
                 {mockNotifications.map(notification => (
@@ -190,9 +185,7 @@ export function Header({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           )}
         </div>
 
-        <Button variant="ghost" size="sm" className="hidden sm:flex" onClick={() => {}}>
-          <Sun className="h-5 w-5" />
-        </Button>
+
 
         <div className="relative" ref={userMenuRef}>
           <Button variant="ghost" size="sm" onClick={() => setShowUserMenu(!showUserMenu)} aria-label="User menu" aria-expanded={showUserMenu} className="gap-2">

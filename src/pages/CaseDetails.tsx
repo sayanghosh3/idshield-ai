@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabTrigger, TabContent } from '../components/common/Tab
 import { Progress } from '../components/common/Progress';
 import { IncompleteCase } from '../components/common/IncompleteCase';
 import { hasCompleteResult, analysisStatuses } from '../utils/screeningStatus';
-import { mockCaseNotes } from '../mocks/cases';
+import { mockCaseNotes } from '../services/demoCatalog';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 
 export function CaseDetails() {
@@ -33,12 +33,12 @@ export function CaseDetails() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
       <DemoCaseContext record={caseData} />
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+      <div className="flex flex-wrap items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="Back">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-text">{caseData.caseNumber}</h1>
             <Badge variant={caseData.riskLevel === 'high' ? 'danger' : caseData.riskLevel === 'review' ? 'warning' : 'success'} size="md">
               {getRiskLevelLabel(caseData.riskLevel)} RISK
@@ -56,7 +56,7 @@ export function CaseDetails() {
       </div>
 
       <Tabs key={caseData.id + tab} defaultValue={tab} variant="line">
-        <TabsList className="grid grid-cols-4 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Case sections">
+        <TabsList className="flex gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Case sections">
           {['Overview', 'Document', 'Evidence', 'Audit'].map(tab => (
             <TabTrigger key={tab.toLowerCase()} value={tab.toLowerCase()}>{tab}</TabTrigger>
           ))}

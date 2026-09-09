@@ -119,12 +119,12 @@ export function StepProgress({ steps, currentStep, completedSteps = [], statuses
   const completed = (index: number) => statuses ? statuses[index] === 'completed' : completedSteps.includes(index);
   const processing = (index: number) => statuses ? statuses[index] === 'processing' : index === currentStep;
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('relative max-w-full overflow-x-auto pb-2', className)}>
       {orientation === 'horizontal' ? (
-        <div className="flex items-center">
+        <div className="flex items-start min-w-[680px]">
           {steps.map((step, index) => (
             <div key={step} className="flex flex-col items-center flex-1 relative">
-              <div className="flex items-center justify-center">
+              <div className="relative z-10 flex items-center justify-center">
                 <div
                   className={cn(
                     'w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all duration-300',
@@ -144,7 +144,7 @@ export function StepProgress({ steps, currentStep, completedSteps = [], statuses
                   )}
                 </div>
               </div>
-              <span className={cn('mt-2 text-xs text-center max-w-[80px]', index <= currentStep ? 'text-text font-medium' : 'text-muted-text')}>
+              <span className={cn('mt-2 text-xs text-center max-w-[92px]', index <= currentStep ? 'text-text font-medium' : 'text-muted-text')}>
                 {step}{statuses ? `: ${statuses[index]}` : ''}
               </span>
               {index < steps.length - 1 && (

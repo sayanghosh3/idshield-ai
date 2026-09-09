@@ -1,4 +1,5 @@
-import { caseWorkflowStatus } from '../utils/screeningStatus';
+import { useMemo } from 'react';
+import { groupRiskCases, caseStatusVariants } from '../utils/casePresentation';
 import { useCases } from '../hooks/useCases';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
@@ -7,11 +8,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { caseStatusOptions } from '../mocks/cases';
-import { CaseListItem } from '../types/case';
 import { getRiskLevelColor, getRiskLevelLabel, formatScore, formatDateTime } from '../utils/formatters';
-import { FadeIn, StaggerContainer, AnimatedStatus } from '../components/animations';
+import { FadeIn, StaggerContainer } from '../components/animations';
 
-const riskGroupOrder = { high: 0, review: 1, low: 2, unknown: 3 };
 const riskGroupLabels: Record<string, string> = {
   high: 'High Risk',
   review: 'Moderate Risk',
@@ -35,18 +34,7 @@ export function RiskCases() {
   const { listItems: mockCases } = useCases();
   const navigate = useNavigate();
 
-  const sortedCases = [...mockCases].sort((a, b) => {
-    const groupDiff = riskGroupOrder[a.riskLevel as keyof typeof riskGroupOrder] - riskGroupOrder[b.riskLevel as keyof typeof riskGroupOrder];
-    if (groupDiff !== 0) return groupDiff;
-    return (b.riskScore ?? -1) - (a.riskScore ?? -1);
-  });
-
-  const groupedCases = sortedCases.reduce((acc, caseItem) => {
-    const group = caseItem.riskLevel;
-    if (!acc[group]) acc[group] = [];
-    acc[group].push(caseItem);
-    return acc;
-  }, {} as Record<string, CaseListItem[]>);
+  const groupedCases = useMemo(() => groupRiskCases(mockCases), [mockCases]);
 
   const riskGroups = ['high', 'review', 'low', 'unknown'] as const;
 
@@ -94,16 +82,15 @@ export function RiskCases() {
                       )},
                       { key: 'status', header: 'Status', render: (row) => {
                         const config = getStatusConfig(row.status);
-                        const animatedStatus = caseWorkflowStatus(row.status);
                         return (
-                          <AnimatedStatus status={animatedStatus} className={config.color}>
+                          <Badge variant={caseStatusVariants[row.status]}>
                             {config.label || row.status.replace('_', ' ')}
-                          </AnimatedStatus>
+                          </Badge>
                         );
                       }},
                       { key: 'createdAt', header: 'Created', render: (row) => formatDateTime(row.createdAt) },
                       { key: 'actions', header: 'Action', render: (row) => (
-                        <Link to={`/cases/${row.id}`} className="btn-secondary text-sm" onClick={() => navigate(`/cases/${row.id}`)}>
+                        <Link to={`/cases/${row.id}`} className="btn-secondary text-sm">
                           Open
                         </Link>
                       )},

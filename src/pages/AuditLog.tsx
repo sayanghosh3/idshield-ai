@@ -1,17 +1,18 @@
+import type { AuditEvent } from '../types/case';
+import { Modal } from '../components/common/Modal';
 import { Link } from 'react-router-dom';
 import { useCases } from '../hooks/useCases';
 import { useState, useMemo } from 'react';
-import { Search, Filter, Download, Calendar, ChevronDown, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Filter, Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
+import { Card, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
-import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
 
-import { formatDateTime, formatRelativeTime } from '../utils/formatters';
-import { FadeIn, StaggerContainer } from '../components/animations';
+import { formatDateTime } from '../utils/formatters';
+import { FadeIn } from '../components/animations';
 
 export function AuditLog() {
   const { auditEvents: mockAuditEvents, cases } = useCases();
@@ -19,7 +20,7 @@ export function AuditLog() {
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
 
   const categories = [...new Set(mockAuditEvents.map(e => e.category))];
   const statuses = [...new Set(mockAuditEvents.map(e => e.status))];
@@ -30,6 +31,8 @@ export function AuditLog() {
         const query = searchQuery.toLowerCase();
         if (!event.event.toLowerCase().includes(query) &&
             !event.actor.toLowerCase().includes(query) &&
+            !event.caseId?.toLowerCase().includes(query) &&
+            !cases.find(record => record.id === event.caseId)?.caseNumber.toLowerCase().includes(query) &&
             !JSON.stringify(event.details ?? {}).toLowerCase().includes(query)) {
           return false;
         }
@@ -38,7 +41,7 @@ export function AuditLog() {
       if (statusFilter.length > 0 && !statusFilter.includes(event.status)) return false;
       return true;
     });
-  }, [mockAuditEvents, searchQuery, categoryFilter, statusFilter]);
+  }, [mockAuditEvents, cases, searchQuery, categoryFilter, statusFilter]);
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -62,10 +65,7 @@ export function AuditLog() {
               <Filter className="w-4 h-4 mr-2" />
               Filters
             </Button>
-            <Button variant="secondary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Logs
-            </Button>
+            <Link to="/reports" className="btn-secondary">Case Reports / Export</Link>
           </div>
         </div>
       </FadeIn>
@@ -145,9 +145,9 @@ export function AuditLog() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.2, delay: index * 0.03 }}
-                      className={cn('flex items-start gap-4 p-4 hover:bg-panel-secondary/50 transition-colors cursor-pointer', selectedEvent?.id === event.id && 'bg-primary-accent/5')}
-                      onClick={() => setSelectedEvent(selectedEvent?.id === event.id ? null : event)}
+                      transition={{ duration: 0.2, delay: Math.min(index * 0.02, 0.15) }}
+                      className={cn('flex flex-wrap sm:flex-nowrap items-start gap-3 p-4 hover:bg-panel-secondary/50 transition-colors cursor-pointer', selectedEvent?.id === event.id && 'bg-primary-accent/5')}
+                      onClick={() => setSelectedEvent(event)}
                     >
                       <div className="flex-shrink-0 w-20 text-right text-muted-text text-xs font-mono pr-4 border-r border-border/50">
                         <div>{formatDateTime(event.timestamp).split(', ')[0]}</div>
@@ -162,8 +162,8 @@ export function AuditLog() {
                         <Icon className={cn('w-5 h-5', config.color)} />
                       </motion.div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-text">{event.event}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button type="button" className="font-medium text-text text-left" onClick={e => { e.stopPropagation(); setSelectedEvent(event); }}>{event.event}</button>
                           <Badge variant={event.status === 'success' ? 'success' : event.status === 'warning' ? 'warning' : event.status === 'error' ? 'danger' : 'info'} size="sm">
                             {event.status}
                           </Badge>
@@ -176,45 +176,7 @@ export function AuditLog() {
                           </p>
                         )}
                       </div>
-                      <AnimatePresence>
-                        {selectedEvent?.id === event.id && (
-                          <motion.div
-                            key="modal"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.2 }}
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
-                          >
-                            <div className="bg-panel border border-border rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-                              <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-semibold text-text">Event Details</h3>
-                                <Button variant="ghost" size="sm" onClick={() => setSelectedEvent(null)} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                  <XCircle className="w-5 h-5" />
-                                </Button>
-                              </div>
-                              <div className="space-y-3 text-sm">
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div><span className="text-muted-text">Timestamp</span><p className="font-mono">{formatDateTime(event.timestamp)}</p></div>
-                                  <div><span className="text-muted-text">Event</span><p className="font-medium">{event.event}</p></div>
-                                  <div><span className="text-muted-text">Category</span><p className="capitalize">{event.category}</p></div>
-                                  <div><span className="text-muted-text">Status</span><Badge variant={event.status === 'success' ? 'success' : event.status === 'warning' ? 'warning' : event.status === 'error' ? 'danger' : 'info'}>{event.status}</Badge></div>
-                                  <div><span className="text-muted-text">Actor</span><p>{event.actor}</p></div>
-                                  <div><span className="text-muted-text">Actor Type</span><p className="capitalize">{event.actorType}</p></div>
-                                  {event.ipAddress && <div><span className="text-muted-text">IP Address</span><p className="font-mono">{event.ipAddress}</p></div>}
-                                  {event.userAgent && <div><span className="text-muted-text">User Agent</span><p className="font-mono truncate">{event.userAgent}</p></div>}
-                                </div>
-                                {event.details && (
-                                  <div>
-                                    <span className="text-muted-text">Details</span>
-                                    <pre className="mt-2 p-3 bg-panel-secondary rounded-lg text-xs overflow-x-auto"><code>{JSON.stringify(event.details, null, 2)}</code></pre>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
+
                     </motion.div>
                   );
                 })}
@@ -224,6 +186,14 @@ export function AuditLog() {
         </Card>
       </FadeIn>
 
+      <Modal isOpen={selectedEvent !== null} onClose={() => setSelectedEvent(null)} title="Event Details" size="lg">
+        {selectedEvent && <div className="space-y-3 text-sm">
+          <p className="font-semibold">{selectedEvent.event}</p>
+          <p>{formatDateTime(selectedEvent.timestamp)} · {selectedEvent.actor} · {selectedEvent.status}</p>
+          {selectedEvent.caseId && <Link className="text-primary-accent" to={'/cases/' + selectedEvent.caseId}>Open related case</Link>}
+          <pre className="overflow-x-auto rounded bg-panel-secondary p-3">{JSON.stringify(selectedEvent.details ?? {}, null, 2)}</pre>
+        </div>}
+      </Modal>
       <FadeIn delay={0.2}>
         <div className="flex items-center justify-between text-sm text-muted-text">
           <span>Showing {filteredEvents.length} of {mockAuditEvents.length} events</span>

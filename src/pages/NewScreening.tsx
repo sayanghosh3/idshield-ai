@@ -17,8 +17,7 @@ import { useDemoMode } from '../hooks/useDemoMode';
 import { caseRepository } from '../services/caseRepository';
 import { createScreeningRunner } from '../services/screeningRun';
 import { STEP_ORDER, initialStepStatuses, hasCompleteResult, withoutResults, faceOutcome } from '../utils/screeningStatus';
-import { demoDocuments, allowedFileTypes, maxFileSize } from '../mocks/documents';
-import { screeningSteps, createDemoCase } from '../mocks/screeningData';
+import { demoDocuments, allowedFileTypes, maxFileSize, screeningSteps, createDemoCase } from '../services/demoCatalog';
 import type { ScreeningStep, ScreeningCase, DocumentFile } from '../types';
 import { formatFileSize, formatRelativeTime, getRiskLevelLabel } from '../utils/formatters';
 import { FadeIn, StaggerContainer, AnimatedNumber, AnimatedStatus } from '../components/animations';
@@ -89,7 +88,8 @@ export function NewScreening() {
     clearSelfies();
     if (handoff.current?.documentFiles?.every(file => file instanceof File)) addFiles(handoff.current.documentFiles);
     if (handoff.current?.selfieFiles?.every(file => file instanceof File)) addSelfies(handoff.current.selfieFiles);
-    return () => { mounted.current = false; runner.current.cancel(); };
+    const activeRunner = runner.current;
+    return () => { mounted.current = false; activeRunner.cancel(); };
   }, [resetScreening, clearFiles, clearSelfies, addFiles, addSelfies]);
 
   const currentStepIndex = STEP_ORDER.indexOf(currentStep);
@@ -181,9 +181,9 @@ export function NewScreening() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <FadeIn>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="Back">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div>
@@ -191,7 +191,7 @@ export function NewScreening() {
               <p className="text-muted-text">Multi-step AI-powered document screening workflow</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {demoEnabled && activeScenario && (
               <Badge variant="info" className="gap-1">
                 <span className="w-2 h-2 rounded-full bg-primary-accent" />
@@ -222,9 +222,9 @@ export function NewScreening() {
 
       <FadeIn delay={0.15}>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+          <div className="min-w-0 lg:col-span-2 space-y-6">
             <Tabs defaultValue="upload" value={activeTab} onChange={setActiveTab} variant="enclosed">
-              <TabsList className="grid grid-cols-7 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Screening steps">
+              <TabsList className="flex gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Screening steps">
                 {screeningSteps.map((step, index) => {
                   const status = getStepStatus(step.step);
                   return (
@@ -241,7 +241,7 @@ export function NewScreening() {
                     >
                       <div className="flex items-center justify-center gap-1.5">
                         <AnimatedStatus status={status} />
-                        <span className="hidden sm:inline">{step.label}</span>
+                        <span>{step.label}</span>
                       </div>
                     </TabTrigger>
                   );
@@ -862,7 +862,7 @@ function FaceVerificationView({ results }: { results: any }) {
           <p className="text-sm text-muted-text mt-2">Threshold: {results.threshold}%</p>
         </div>
 
-        <div className="mt-6 grid grid-cols-4 gap-4">
+        <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-panel-secondary rounded-lg p-4 text-center">
             <p className="text-2xl font-bold text-text">{results.documentFace.qualityScore}%</p>
             <p className="text-sm text-muted-text">Document Face Quality</p>

@@ -1,17 +1,18 @@
+import { caseStatusVariants } from '../utils/casePresentation';
 import { useCases } from '../hooks/useCases';
 import { useState, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Filter, ChevronDown, Download, FileText } from 'lucide-react';
+import { Filter, FileText } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
+import { Card, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
 import { caseStatusOptions, riskLevelOptions } from '../mocks/cases';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
-import { FadeIn, StaggerContainer } from '../components/animations';
+import { FadeIn } from '../components/animations';
 
 export function Cases() {
   const { listItems: mockCases } = useCases();
@@ -62,7 +63,6 @@ export function Cases() {
     }
   };
 
-  const getStatusConfig = (status: string) => caseStatusOptions.find(s => s.value === status) || { color: '' };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -73,14 +73,11 @@ export function Cases() {
             <p className="text-muted-text">Manage and review screening cases</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => setShowFilters(!showFilters)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button variant="ghost" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Filter className="w-4 h-4 mr-2" />
               Filters
             </Button>
-            <Button variant="primary" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </Button>
+            <Link to="/reports" className="btn-primary">Reports / Export</Link>
           </div>
         </div>
       </FadeIn>
@@ -99,7 +96,7 @@ export function Cases() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <Input
-                      placeholder="Search cases, names, passport numbers..."
+                      placeholder="Search case ID or subject name…"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
                       label="Search"
@@ -151,10 +148,10 @@ export function Cases() {
           <CardContent className="p-0">
             <Table
               columns={[
-                { key: 'caseNumber', header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
+                { key: 'caseNumber', sortable: true, header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
                 { key: 'subjectName', header: 'Name' },
                 { key: 'documentType', header: 'Document' },
-                { key: 'riskScore', header: 'Risk', render: (row) => (
+                { key: 'riskScore', sortable: true, header: 'Risk', render: (row) => (
                   <div className="flex items-center gap-2">
                     <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
                     <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : row.riskLevel === 'low' ? 'success' : 'neutral'} size="sm">
@@ -163,19 +160,20 @@ export function Cases() {
                   </div>
                 )},
                 { key: 'status', header: 'Status', render: (row) => {
-                  const config = getStatusConfig(row.status);
-                  return <Badge variant="neutral" className={config.color}>{row.status.replace('_', ' ')}</Badge>;
+                  return <Badge variant={caseStatusVariants[row.status]}>{row.status.replace('_', ' ')}</Badge>;
                 }},
-                { key: 'createdAt', header: 'Created', render: (row) => formatRelativeTime(row.createdAt) },
+                { key: 'createdAt', sortable: true, header: 'Created', render: (row) => formatRelativeTime(row.createdAt) },
                 { key: 'actions', header: 'Actions', render: (row) => (
                   <div className="flex items-center gap-2">
                     <Link to={`/cases/${row.id}`} className="btn-secondary text-sm">Open</Link>
-                    <Button variant="ghost" size="sm" className="text-sm" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                      <FileText className="w-4 h-4" />
-                    </Button>
+                    <Link to={`/reports?caseId=${row.id}`} className="text-primary-accent" aria-label={`Report for ${row.caseNumber}`}><FileText className="w-4 h-4" /></Link>
                   </div>
                 )},
               ]}
+              sortBy={sortField}
+              sortDirection={sortDirection}
+              onSort={key => { if (key === 'createdAt' || key === 'riskScore' || key === 'caseNumber') handleSort(key); }}
+              emptyMessage="No cases match these filters. Adjust the search or clear the selected filters."
               data={filteredCases}
               keyExtractor={row => row.id}
               clickable
