@@ -1,4 +1,5 @@
 import { useCases } from '../hooks/useCases';
+import type { CaseStatus } from '../types/case';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowUpRight, ArrowDownRight, Minus, Users, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '../utils/cn';
@@ -8,6 +9,14 @@ import { Table } from '../components/common/Table';
 
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 import { StaggerContainer, FadeIn, AnimatedCard } from '../components/animations';
+
+const caseStatusVariants = {
+  closed: 'success',
+  archived: 'neutral',
+  under_review: 'warning',
+  escalated: 'danger',
+  open: 'info',
+} as const satisfies Record<CaseStatus, 'success' | 'neutral' | 'warning' | 'danger' | 'info'>;
 
 const kpiCards = [
   {
@@ -120,7 +129,7 @@ export function Dashboard() {
                     </Badge>
                   </div>
                 )},
-                { key: 'status', header: 'Status', render: (row) => <Badge variant={row.status === 'failed' ? 'danger' : row.status === 'completed' ? 'success' : row.status === 'processing' ? 'warning' : 'info'}>{row.status.replace('_', ' ')}</Badge> },
+                { key: 'status', header: 'Status', render: (row) => <Badge variant={caseStatusVariants[row.status]}>{row.status.replace('_', ' ')}</Badge> },
                 { key: 'createdAt', header: 'Time', render: (row) => formatRelativeTime(row.createdAt) },
                 { key: 'action', header: 'Action', render: (row) => (
                   <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline text-sm font-medium">Open</Link>

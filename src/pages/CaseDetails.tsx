@@ -17,7 +17,7 @@ export function CaseDetails() {
   const navigate = useNavigate();
   const { cases, auditEvents: mockAuditEvents, reports: mockReports } = useCases();
   const caseData = cases.find(c => c.id === caseId || c.caseNumber === caseId);
-  if (!caseData || !hasCompleteResult(caseData)) return <IncompleteCase record={caseData} />;
+  if (!caseData || caseData.riskScore === null || !hasCompleteResult(caseData)) return <IncompleteCase record={caseData} />;
   const outcomes = analysisStatuses(caseData);
   const auditEvents = mockAuditEvents.filter(e => e.caseId === caseData.id);
   const reports = mockReports.filter(r => r.caseId === caseData.id);
