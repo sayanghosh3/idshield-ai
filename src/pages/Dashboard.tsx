@@ -18,7 +18,7 @@ const caseStatusVariants = {
   open: 'info',
 } as const satisfies Record<CaseStatus, 'success' | 'neutral' | 'warning' | 'danger' | 'info'>;
 
-const kpiCards = [
+const kpiTemplates = [
   {
     title: "Today's Screenings",
     value: '127',
@@ -63,6 +63,11 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { listItems } = useCases();
   const recentCases = listItems.slice(0, 5);
+  const counts = [listItems.length, listItems.filter(item => item.riskLevel === 'high').length,
+    listItems.filter(item => item.status === 'under_review').length, listItems.filter(item => item.riskLevel === 'low').length];
+  const kpiCards = kpiTemplates.map((card, index) => ({ ...card, value: String(counts[index]),
+    title: index === 0 ? 'Cases in this session' : index === 2 ? 'Awaiting Review' : card.title,
+    change: 'Demo records', trend: 'neutral' }));
   return (
     <div className="space-y-6">
       <FadeIn>
@@ -96,7 +101,7 @@ export function Dashboard() {
                         <span className={cn('text-sm font-medium', kpi.trend === 'up' && 'text-success', kpi.trend === 'down' && 'text-danger', kpi.trend === 'neutral' && 'text-muted-text')}>
                           <TrendIcon className="w-4 h-4 inline" /> {kpi.change}
                         </span>
-                        <span className="text-xs text-muted-text">vs last week</span>
+                        <span className="text-xs text-muted-text">in this session</span>
                       </div>
                     </div>
                     <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', kpi.bg)}>

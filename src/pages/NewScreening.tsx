@@ -1,5 +1,7 @@
+import { createDemoRun, demoStepOperation } from '../services/demoWorkflow';
+import { DocumentPreview } from '../components/common/DocumentPreview';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowLeft, ArrowRight, X, CheckCircle, AlertCircle, Loader2, FileText, Image, Upload, RotateCcw, ZoomIn, ZoomOut, Maximize2, Minimize2, Shield } from 'lucide-react';
 import { cn } from '../utils/cn';
@@ -13,16 +15,24 @@ import { useFileUpload, useImageTransform } from '../hooks/useFileUpload';
 import { useScreening } from '../hooks/useScreening';
 import { useDemoMode } from '../hooks/useDemoMode';
 import { caseRepository } from '../services/caseRepository';
-import { createScreeningRunner, waitForStep, SkippedStep } from '../services/screeningRun';
+import { createScreeningRunner } from '../services/screeningRun';
 import { STEP_ORDER, initialStepStatuses, hasCompleteResult, withoutResults, faceOutcome } from '../utils/screeningStatus';
 import { demoDocuments, allowedFileTypes, maxFileSize } from '../mocks/documents';
 import { screeningSteps, createDemoCase } from '../mocks/screeningData';
-import type { ScreeningStep, ScreeningCase } from '../types';
+import type { ScreeningStep, ScreeningCase, DocumentFile } from '../types';
 import { formatFileSize, formatRelativeTime, getRiskLevelLabel } from '../utils/formatters';
 import { FadeIn, StaggerContainer, AnimatedNumber, AnimatedStatus } from '../components/animations';
 
 
+const SELFIE_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
+function inputDocument(file: File): DocumentFile {
+  return { id: crypto.randomUUID(), name: file.name, size: file.size, type: file.type,
+    preview: URL.createObjectURL(file), documentType: 'other', uploadedAt: new Date() };
+}
 export function NewScreening() {
+  const location = useLocation();
+  const handoff = useRef(location.state as { documentFiles?: File[]; selfieFiles?: File[] } | null);
+  const [liveness, setLiveness] = useState<'live' | 'spoof' | 'unknown'>('live');
   const navigate: ReturnType<typeof useNavigate> = useNavigate();
   const {
     currentCase,
@@ -43,7 +53,7 @@ export function NewScreening() {
     loadDemoScenario,
   } = useScreening();
 
-  const { enabled: demoEnabled, activeScenario, setActiveScenario, scenarios } = useDemoMode();
+  const { enabled: demoEnabled, setEnabled, activeScenario, setActiveScenario, scenarios } = useDemoMode();
   const [activeTab, setActiveTab] = useState('upload');
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -53,17 +63,13 @@ export function NewScreening() {
   const stepStatuses = currentCase?.stepStatuses ?? initialStepStatuses();
   const completedSteps = STEP_ORDER.filter(step => stepStatuses[step] === 'completed');
 
-  useEffect(() => {
-    mounted.current = true;
-    resetScreening();
-    return () => { mounted.current = false; runner.current.cancel(); };
-  }, [resetScreening]);
 
   const {
     files,
     errors,
     isDragging,
     fileInputRef,
+    addFiles,
     removeFile: removeUploadedFile,
     clearFiles,
     handleDragOver,
@@ -73,37 +79,47 @@ export function NewScreening() {
     openFileDialog,
   } = useFileUpload(allowedFileTypes, maxFileSize);
 
+  const selfie = useFileUpload(SELFIE_TYPES, maxFileSize);
+  const addSelfies = selfie.addFiles;
+  const clearSelfies = selfie.clearFiles;
+  useEffect(() => {
+    mounted.current = true;
+    resetScreening();
+    clearFiles();
+    clearSelfies();
+    if (handoff.current?.documentFiles?.every(file => file instanceof File)) addFiles(handoff.current.documentFiles);
+    if (handoff.current?.selfieFiles?.every(file => file instanceof File)) addSelfies(handoff.current.selfieFiles);
+    return () => { mounted.current = false; runner.current.cancel(); };
+  }, [resetScreening, clearFiles, clearSelfies, addFiles, addSelfies]);
+
   const currentStepIndex = STEP_ORDER.indexOf(currentStep);
   const isStepCompleted = (step: ScreeningStep) => stepStatuses[step] === 'completed';
   const getStepStatus = (step: ScreeningStep) => stepStatuses[step];
 
   const handleDemoSelect = useCallback((scenarioId: string) => {
     if (running.current) return;
-    const demoCase = caseRepository.find(createDemoCase(scenarioId).id);
-    if (!demoCase) { setError('Demo case not found'); return; }
+    const demoCase = withoutResults(createDemoCase(scenarioId));
     clearFiles();
+    clearSelfies();
     loadDemoScenario(demoCase);
+    setEnabled(true);
     setActiveScenario(scenarioId);
-    setActiveTab('result');
+    setActiveTab('upload');
     setShowDemoModal(false);
-    caseRepository.addAudit({
-      id: crypto.randomUUID(), caseId: demoCase.id, timestamp: new Date(),
-      event: 'Demo scenario loaded', category: 'user', status: 'info',
-      actor: 'Security Operator', actorType: 'user',
-    });
-  }, [clearFiles, loadDemoScenario, setActiveScenario, setError]);
+  }, [clearFiles, clearSelfies, loadDemoScenario, setEnabled, setActiveScenario]);
 
   const handleStartScreening = useCallback(async () => {
     if (running.current) return;
-    const scenario = files.length === 0 ? activeScenario : null;
+    const scenario = demoEnabled ? activeScenario : null;
     if (!files.length && !scenario) {
       setError('Please upload a document or select a demo scenario');
       return;
     }
+    if (scenario && files.length && !selfie.files[0]) { setError('Add a selfie or choose a sample pair.'); return; }
     const template = scenario ? createDemoCase(scenario) : null;
     const identity = crypto.randomUUID();
     const now = new Date();
-    const record: ScreeningCase = {
+    const record: ScreeningCase = scenario ? createDemoRun(scenario, files.map(inputDocument), selfie.files[0] ? inputDocument(selfie.files[0]) : undefined, liveness) : {
       ...(template ? withoutResults(template) : {}),
       id: `case-${identity}`, caseNumber: `ID-${now.getFullYear()}-${identity.toUpperCase()}`,
       subjectName: template?.subjectName ?? 'Not extracted',
@@ -122,18 +138,8 @@ export function NewScreening() {
     setActiveTab('upload');
     const reported = new Set<string>();
     try {
-      const result = await runner.current.run(record, async (step, _record, signal) => {
-        await waitForStep(signal);
-        if (step === 'upload' || step === 'result') return {};
-        if (!template) throw new SkippedStep('Analysis of uploaded files requires a connected backend. No result was generated.');
-        switch (step) {
-          case 'extraction': return { ocrResult: template.ocrResult };
-          case 'validation': return { validationResult: template.validationResult };
-          case 'forensics': return { tamperingResult: template.tamperingResult };
-          case 'face_verification': return { faceResult: template.faceResult };
-          case 'risk_assessment': return { riskResult: template.riskResult };
-        }
-      }, update => {
+      const result = await runner.current.run(record, demoStepOperation(), update => {
+        update = { ...update, caseStatus: update.status === 'completed' ? 'under_review' : 'open' };
         caseRepository.upsert(update);
         for (const step of STEP_ORDER) {
           const status = update.stepStatuses![step];
@@ -150,6 +156,7 @@ export function NewScreening() {
         if (mounted.current) loadDemoScenario(update);
       });
       if (mounted.current) {
+        if (result.status === 'completed') { navigate('/screening/result/' + result.id, { replace: true }); return; }
         setActiveTab('result');
         if (result.status === 'incomplete') setError('Screening cancelled. No final result is available.');
       }
@@ -159,16 +166,17 @@ export function NewScreening() {
       running.current = false;
       if (mounted.current) setIsProcessing(false);
     }
-  }, [files, activeScenario, loadDemoScenario, setError]);
+  }, [files, selfie.files, activeScenario, demoEnabled, liveness, loadDemoScenario, setError, navigate]);
 
   const handleReset = useCallback(() => {
     runner.current.cancel();
     resetScreening();
     clearFiles();
+    clearSelfies();
     setActiveTab('upload');
     setActiveScenario(null);
     setError(null);
-  }, [resetScreening, clearFiles, setActiveScenario, setError]);
+  }, [resetScreening, clearFiles, clearSelfies, setActiveScenario, setError]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -247,15 +255,40 @@ export function NewScreening() {
                     <CardTitle>Document Upload</CardTitle>
                   </CardHeader>
                   <CardContent>
+                    <div className="space-y-3 mb-5">
+                      <Badge variant="warning">SIH DEMO — No government database access</Badge>
+                      <p className="text-sm text-muted-text">Choose a sample pair, or upload a document and selfie and select a scenario. OCR, MRZ checks, tampering, face comparison and liveness are simulated from that scenario, not measured from your uploads. Inputs stay in this browser session. Use sample data only.</p>
+                      <label className="block label">Simulation scenario
+                        <select className="input mt-1" disabled={isProcessing} value={demoEnabled ? activeScenario ?? '' : ''} onChange={event => {
+                          const id = event.target.value;
+                          resetScreening(); setEnabled(!!id); setActiveScenario(id || null);
+                          if (id && !files.length) loadDemoScenario(withoutResults(createDemoCase(id)));
+                        }}>
+                          <option value="">No simulation — real analysis unavailable</option>
+                          {scenarios.map(scenario => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}
+                        </select>
+                      </label>
+                      <label className="block label">Selfie input (PNG or JPEG)
+                        <input className="input mt-1" type="file" accept={SELFIE_TYPES.join(',')} disabled={isProcessing} onChange={event => { resetScreening(); clearSelfies(); selfie.handleFileSelect(event); }} />
+                      </label>
+                      <p className="text-sm text-muted-text">{selfie.files[0]?.name ?? (demoEnabled && activeScenario && !files.length ? 'Using the selected sample selfie paired with the sample document.' : 'Add a selfie for an uploaded document.')}</p>
+                      {Object.values(selfie.errors).map(message => <p key={message} role="alert" className="text-danger text-sm">{message}</p>)}
+                      <label className="block label">Simulated liveness outcome
+                        <select className="input mt-1" disabled={isProcessing} value={liveness} onChange={event => setLiveness(event.target.value as typeof liveness)}>
+                          <option value="live">Live — simulated</option><option value="spoof">Spoof attempt — simulated</option><option value="unknown">Inconclusive — simulated</option>
+                        </select>
+                      </label>
+                    </div>
                     <motion.div
                       className={cn(
                         'border-2 border-dashed rounded-xl p-8 text-center transition-colors',
                         isDragging ? 'border-primary-accent bg-primary-accent/5' : 'border-border hover:border-primary-accent/50'
                       )}
+                      onKeyDown={event => { if (!running.current && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); openFileDialog(); } }}
                       onDragOver={handleDragOver}
                       onDragLeave={handleDragLeave}
-                      onDrop={event => { if (running.current) event.preventDefault(); else { resetScreening(); setActiveScenario(null); setActiveTab('upload'); handleDrop(event); } }}
-                      onClick={() => { if (!running.current) { resetScreening(); setActiveScenario(null); setActiveTab('upload'); openFileDialog(); } }}
+                      onDrop={event => { if (running.current) event.preventDefault(); else { resetScreening(); setActiveTab('upload'); handleDrop(event); } }}
+                      onClick={() => { if (!running.current) { resetScreening(); setActiveTab('upload'); openFileDialog(); } }}
                       role="button"
                       tabIndex={0}
                       aria-label="Drop zone for document upload"
@@ -267,6 +300,7 @@ export function NewScreening() {
                         ref={fileInputRef}
                         type="file"
                         accept={allowedFileTypes.join(',')}
+                        onClick={event => event.stopPropagation()}
                         onChange={event => { if (!running.current) handleFileSelect(event); }}
                         className="hidden"
                         aria-hidden="true"
@@ -322,7 +356,7 @@ export function NewScreening() {
                               {files.length === 0 && uploadedDocuments.map(doc => (
                                 <FadeIn key={doc.id} y={4}>
                                   <div className="flex items-center gap-4 p-3 bg-panel-secondary rounded-lg border border-border">
-                                    <img src={doc.preview} alt={doc.name} className="w-12 h-12 rounded-lg object-cover" />
+                                    <DocumentPreview document={doc} className="w-24 min-h-16" />
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-text truncate">{doc.name}</p>
                                       <p className="text-xs text-muted-text">{formatFileSize(doc.size)} • {doc.documentType}</p>
@@ -341,7 +375,7 @@ export function NewScreening() {
 
                     <FadeIn delay={0.2} y={8}>
                       <div className="mt-6 pt-6 border-t border-border">
-                        <h4 className="font-medium text-text mb-3">Demo Documents</h4>
+                        <h4 className="font-medium text-text mb-3">Sample Document / Selfie Pairs</h4>
                         <StaggerContainer staggerChildren={0.05}>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {Object.entries(demoDocuments).map(([key, doc]) => (
@@ -353,7 +387,7 @@ export function NewScreening() {
                                   whileHover={{ x: 4 }}
                                   whileTap={{ scale: 0.98 }}
                                 >
-                                  <img src={doc.preview} alt={doc.name} className="w-10 h-10 rounded-lg object-cover" />
+                                  <FileText className="w-10 h-10 text-muted-text" />
                                   <div className="flex-1 min-w-0">
                                     <p className="font-medium text-text truncate">{doc.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')}</p>
                                     <p className="text-xs text-muted-text">Demo • {formatFileSize(doc.size)}</p>
@@ -583,18 +617,13 @@ function ImagePreviewer({ documents, onImageSelect }: { documents: any[]; onImag
             )}
             aria-label={`Select ${doc.name}`}
           >
-            <img src={doc.preview} alt={doc.name} className="w-16 h-12 rounded object-cover" />
+            <FileText className="w-16 h-12 text-muted-text" />
           </button>
         ))}
       </div>
       <div className="relative bg-panel-secondary rounded-lg overflow-hidden min-h-[300px] flex items-center justify-center">
         <div className="relative" style={transformStyle}>
-          <img
-            src={selectedDoc.preview}
-            alt={selectedDoc.name}
-            className="max-w-full max-h-[500px] object-contain"
-            draggable={false}
-          />
+          <DocumentPreview document={selectedDoc} className="max-w-full max-h-[500px] object-contain" />
         </div>
       </div>
       <div className="flex items-center justify-center gap-2 flex-wrap">

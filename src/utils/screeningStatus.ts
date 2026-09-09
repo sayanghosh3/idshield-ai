@@ -32,6 +32,5 @@ export function hasCompleteResult(record: ScreeningCase): boolean {
     STEP_ORDER.every(step => record.stepStatuses?.[step] === 'completed');
 }
 export function withoutResults(record: ScreeningCase): ScreeningCase {
-  return { ...record, status: 'draft', riskLevel: 'unknown', riskScore: null, ocrResult: undefined, validationResult: undefined, tamperingResult: undefined, faceResult: undefined, riskResult: undefined, completedAt: undefined, currentStep: 'upload', stepStatuses: initialStepStatuses() };
+  return { ...record, status: 'draft', riskLevel: 'unknown', riskScore: null, ocrResult: undefined, validationResult: undefined, tamperingResult: undefined, faceResult: undefined, riskResult: undefined, evidence: undefined, officerReview: undefined, caseStatus: 'open', completedAt: undefined, currentStep: 'upload', stepStatuses: initialStepStatuses() };
 }
-

@@ -134,7 +134,7 @@ export function Sidebar({ collapsed = false, onToggle }: { collapsed?: boolean; 
           <div className="mt-6 pt-4 border-t border-border absolute bottom-0 left-0 right-0 p-4">
             <div className="flex items-center gap-2 text-xs text-muted-text mb-2">
               <Circle className="h-2 w-2 text-success" aria-hidden="true" />
-              <span>All systems operational</span>
+              <span>Demo services simulated</span>
             </div>
             <div className="px-2 py-1 bg-danger/20 text-danger text-xs font-medium rounded">
               Demo Environment

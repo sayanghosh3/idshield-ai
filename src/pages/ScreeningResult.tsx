@@ -1,3 +1,6 @@
+import { DemoCaseContext } from '../components/common/DemoCaseContext';
+import { CaseEvidence } from '../components/common/CaseEvidence';
+import { DocumentPreview } from '../components/common/DocumentPreview';
 import { useCases } from '../hooks/useCases';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, FileText, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
@@ -21,6 +24,7 @@ export function ScreeningResult() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+      <DemoCaseContext record={caseData} />
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
@@ -104,10 +108,7 @@ export function ScreeningResult() {
               </div>
             </TabContent>
             <TabContent value="original">
-              <div className="text-center py-8 text-muted-text">
-                <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Original document view would be displayed here</p>
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{caseData.documents.map(document => <DocumentPreview key={document.id} document={document} className="w-full min-h-48 max-h-96 object-contain" />)}</div>
             </TabContent>
             <TabContent value="ocr">
               <div className="space-y-3">
@@ -194,20 +195,21 @@ export function ScreeningResult() {
             <TabContent value="metadata">
               <div className="text-center py-8 text-muted-text">
                 <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Document metadata would be displayed here</p>
+                <p>{caseData.documents.map(document => document.name + ' — ' + document.type + ' — ' + document.size + ' bytes').join('; ')}</p>
               </div>
             </TabContent>
           </Tabs>
         </CardContent>
       </Card>
 
+      <CaseEvidence record={caseData} />
       <div className="flex gap-3 justify-end">
         <Link to="/cases">
           <Button variant="secondary">Back to Cases</Button>
         </Link>
-        <Button variant="primary">
+        <Button variant="primary" onClick={() => navigate(`/cases/${caseData.id}`)}>
           <Download className="w-4 h-4 mr-2" />
-          Generate Report
+          Continue to Officer Review
         </Button>
       </div>
     </div>

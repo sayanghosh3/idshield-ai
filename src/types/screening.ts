@@ -1,4 +1,13 @@
 import type { DocumentType, DocumentFile, OCRResult } from './document';
+import type { CaseStatus } from './case';
+import type { EvidenceItem } from './analysis';
+
+export interface OfficerReview {
+  decision: 'clear' | 'secondary_inspection' | 'refer';
+  officer: string;
+  notes: string;
+  reviewedAt: Date;
+}
 
 export type ScreeningStatus =
   | 'draft'
@@ -105,6 +114,11 @@ export interface RiskResult {
 }
 
 export interface ScreeningCase {
+  caseStatus?: CaseStatus;
+  selfie?: DocumentFile;
+  demo?: { scenarioId: string; inputSource: 'sample' | 'uploaded'; liveness: 'live' | 'spoof' | 'unknown' };
+  evidence?: EvidenceItem[];
+  officerReview?: OfficerReview;
   id: string;
   caseNumber: string;
   status: ScreeningStatus;

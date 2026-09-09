@@ -74,6 +74,7 @@ export interface AuditEvent {
 }
 
 export interface Report {
+  content?: string;
   id: string;
   caseId: string;
   type: 'screening' | 'forensic' | 'summary' | 'custom';

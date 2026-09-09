@@ -12,7 +12,8 @@ function delay(ms: number): Promise<void> {
 export const reportService = {
   async generateReport(caseId: string, type: Report['type'] = 'screening', format: Report['format'] = 'pdf'): Promise<Report> {
     if (DEMO_MODE) {
-      throw new Error('Demo report generation requires a report renderer; no report was generated.');
+      if (format !== 'json') throw new Error('Demo reports support JSON export only.');
+      return caseRepository.generateReport(caseId, type);
     }
 
     const response = await apiRequest<Report>(API_ENDPOINTS.reports, {
@@ -49,7 +50,9 @@ export const reportService = {
   async downloadReport(reportId: string): Promise<Blob> {
     if (DEMO_MODE) {
       await delay(500);
-      throw new Error('Demo PDF export is not available.');
+      const report = caseRepository.getSnapshot().reports.find(item => item.id === reportId);
+      if (!report?.content) throw new Error('This sample report has no downloadable file. Generate a JSON report instead.');
+      return new Blob([report.content], { type: 'application/json' });
     }
 
     const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${API_ENDPOINTS.reports}/${reportId}/download`);

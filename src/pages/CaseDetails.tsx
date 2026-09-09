@@ -1,5 +1,9 @@
+import { OfficerReviewPanel } from '../components/common/OfficerReviewPanel';
+import { DemoCaseContext } from '../components/common/DemoCaseContext';
+import { CaseEvidence } from '../components/common/CaseEvidence';
+import { DocumentPreview } from '../components/common/DocumentPreview';
 import { useCases } from '../hooks/useCases';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Download, AlertTriangle, CheckCircle, Shield, AlertCircle } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
@@ -14,6 +18,8 @@ import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore }
 
 export function CaseDetails() {
   const { caseId } = useParams();
+  const [searchParams] = useSearchParams();
+  const tab = ['overview', 'document', 'evidence', 'audit'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'overview';
   const navigate = useNavigate();
   const { cases, auditEvents: mockAuditEvents, reports: mockReports } = useCases();
   const caseData = cases.find(c => c.id === caseId || c.caseNumber === caseId);
@@ -26,6 +32,7 @@ export function CaseDetails() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+      <DemoCaseContext record={caseData} />
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4" />
@@ -41,14 +48,14 @@ export function CaseDetails() {
           <p className="text-muted-text">Subject: {caseData.subjectName} • {formatRelativeTime(caseData.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={() => navigate(`/reports?caseId=${caseData.id}`)}>
             <Download className="w-4 h-4 mr-2" />
             Generate Report
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" variant="line">
+      <Tabs key={caseData.id + tab} defaultValue={tab} variant="line">
         <TabsList className="grid grid-cols-4 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Case sections">
           {['Overview', 'Document', 'Evidence', 'Audit'].map(tab => (
             <TabTrigger key={tab.toLowerCase()} value={tab.toLowerCase()}>{tab}</TabTrigger>
@@ -182,6 +189,7 @@ export function CaseDetails() {
         </TabContent>
 
         <TabContent value="document">
+          <div className="my-4 grid grid-cols-1 sm:grid-cols-2 gap-4">{caseData.documents.map(document => <DocumentPreview key={document.id} document={document} className="w-full min-h-48 max-h-96 object-contain" />)}</div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <Card padding="lg">
               <CardHeader>
@@ -370,7 +378,7 @@ export function CaseDetails() {
                   <TabContent value="metadata">
                     <div className="text-center py-8 text-muted-text">
                       <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Document metadata would be displayed here</p>
+                      <p>{caseData.documents.map(document => document.name + ' — ' + document.type + ' — ' + document.size + ' bytes').join('; ')}</p>
                     </div>
                   </TabContent>
                 </Tabs>
@@ -394,7 +402,7 @@ export function CaseDetails() {
                           <p className="font-medium text-text">{event.event}</p>
                           <Badge variant={
                             event.status === 'success' ? 'success' :
-                            event.status === 'warning' ? 'warning' : 'danger'
+                            event.status === 'warning' ? 'warning' : event.status === 'error' ? 'danger' : 'info'
                           } size="sm">{event.status}</Badge>
                         </div>
                         <p className="text-sm text-muted-text">{event.actor} ({event.actorType})</p>
@@ -412,6 +420,8 @@ export function CaseDetails() {
           </div>
         </TabContent>
       </Tabs>
+      <CaseEvidence record={caseData} />
+      <OfficerReviewPanel key={caseData.id} record={caseData} />
     </div>
   );
 }

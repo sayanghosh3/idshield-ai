@@ -47,6 +47,7 @@ export function createScreeningRunner() {
           // A stage can update only its own output; it cannot change identity or later evidence.
           const output = step in resultField ? { [resultField[step as keyof typeof resultField]]: patch[resultField[step as keyof typeof resultField]] } : {};
           current = { ...current, ...output,
+            evidence: step === 'result' ? patch.evidence : current.evidence,
             documents: step === 'upload' ? patch.documents ?? current.documents : current.documents,
             stepStatuses: { ...current.stepStatuses!, [step]: 'completed' }, updatedAt: new Date() };
           publish();
@@ -66,4 +67,3 @@ export function createScreeningRunner() {
     },
   };
 }
-
