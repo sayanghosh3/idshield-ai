@@ -32,7 +32,7 @@ export interface CaseListItem {
   subjectName: string;
   documentType: string;
   riskLevel: RiskLevel;
-  riskScore: number;
+  riskScore: number | null;
   status: CaseStatus;
   priority: CasePriority;
   createdAt: Date;
@@ -74,6 +74,7 @@ export interface AuditEvent {
 }
 
 export interface Report {
+  content?: string;
   id: string;
   caseId: string;
   type: 'screening' | 'forensic' | 'summary' | 'custom';

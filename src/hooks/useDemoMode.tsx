@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
-import { demoScenarios } from '../mocks';
+import { demoScenarios } from '../services/demoCatalog';
 
 interface DemoModeContextType {
   enabled: boolean;

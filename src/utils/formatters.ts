@@ -51,38 +51,40 @@ export function formatPercentage(value: number, decimals: number = 1): string {
   return `${value.toFixed(decimals)}%`;
 }
 
-export function formatScore(score: number): string {
-  return `${Math.round(score)} / 100`;
+export function formatScore(score: number | null): string {
+  return score == null || !Number.isFinite(score) ? 'Not assessed' : `${Math.round(score)} / 100`;
 }
 
-export function getRiskLevelColor(level: 'low' | 'review' | 'high'): string {
+export function getRiskLevelColor(level: string): string {
   switch (level) {
     case 'low': return 'text-success bg-success/20';
     case 'review': return 'text-warning bg-warning/20';
     case 'high': return 'text-danger bg-danger/20';
+    default: return 'text-muted-text bg-panel-secondary';
   }
 }
 
-export function getRiskLevelLabel(level: 'low' | 'review' | 'high'): string {
+export function getRiskLevelLabel(level: string): string {
   switch (level) {
     case 'low': return 'LOW';
     case 'review': return 'REVIEW';
     case 'high': return 'HIGH';
+    default: return 'NOT ASSESSED';
   }
 }
 
 export function getStatusColor(status: string): string {
   const statusLower = status.toLowerCase();
-  if (statusLower.includes('pass') || statusLower === 'success' || statusLower === 'clean') {
+  if (statusLower === 'pass' || statusLower === 'success' || statusLower === 'clean') {
     return 'text-success bg-success/20';
   }
-  if (statusLower.includes('warn') || statusLower === 'warning' || statusLower === 'suspicious') {
+  if (statusLower === 'warning' || statusLower === 'warning' || statusLower === 'suspicious') {
     return 'text-warning bg-warning/20';
   }
-  if (statusLower.includes('fail') || statusLower === 'error' || statusLower === 'tampered' || statusLower === 'mismatch') {
+  if (statusLower === 'fail' || statusLower === 'error' || statusLower === 'tampered' || statusLower === 'mismatch') {
     return 'text-danger bg-danger/20';
   }
-  if (statusLower.includes('pending') || statusLower === 'not_checked' || statusLower === 'unknown') {
+  if (statusLower === 'pending' || statusLower === 'not_checked' || statusLower === 'unknown') {
     return 'text-muted-text bg-panel-secondary';
   }
   return 'text-primary-accent bg-primary-accent/20';
@@ -129,11 +131,11 @@ export function interpolateColor(
   const c1 = hexToRgb(color1);
   const c2 = hexToRgb(color2);
   if (!c1 || !c2) return color1;
-  
+
   const r = Math.round(c1.r + (c2.r - c1.r) * factor);
   const g = Math.round(c1.g + (c2.g - c1.g) * factor);
   const b = Math.round(c1.b + (c2.b - c1.b) * factor);
-  
+
   return `rgb(${r}, ${g}, ${b})`;
 }
 

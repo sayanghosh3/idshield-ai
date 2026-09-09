@@ -1,4 +1,4 @@
-import { CaseListItem, CaseStatus, RiskLevel, CasePriority, AuditEvent, Report, CaseNote } from '../types';
+import type { CaseListItem, CaseStatus, RiskLevel, CasePriority, AuditEvent, Report, CaseNote } from '../types';
 
 export const mockCases: CaseListItem[] = [
   {

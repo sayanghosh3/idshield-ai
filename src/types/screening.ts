@@ -1,26 +1,37 @@
-import { DocumentType, DocumentFile, OCRResult } from './document';
+import type { DocumentType, DocumentFile, OCRResult } from './document';
+import type { CaseStatus } from './case';
+import type { EvidenceItem } from './analysis';
 
-export type ScreeningStatus = 
-  | 'draft' 
-  | 'uploading' 
-  | 'processing' 
-  | 'ocr' 
-  | 'validation' 
-  | 'tampering' 
-  | 'face_verification' 
-  | 'risk_assessment' 
-  | 'completed' 
-  | 'failed';
+export interface OfficerReview {
+  decision: 'clear' | 'secondary_inspection' | 'refer';
+  officer: string;
+  notes: string;
+  reviewedAt: Date;
+}
 
-export type RiskLevel = 'low' | 'review' | 'high';
+export type ScreeningStatus =
+  | 'draft'
+  | 'uploading'
+  | 'processing'
+  | 'ocr'
+  | 'validation'
+  | 'tampering'
+  | 'face_verification'
+  | 'risk_assessment'
+  | 'completed'
+  | 'failed'
+  | 'incomplete';
 
-export type ScreeningStep = 
-  | 'upload' 
-  | 'extraction' 
-  | 'validation' 
-  | 'forensics' 
-  | 'face_verification' 
-  | 'risk_assessment' 
+export type RiskLevel = 'low' | 'review' | 'high' | 'unknown';
+export type StepStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'skipped';
+
+export type ScreeningStep =
+  | 'upload'
+  | 'extraction'
+  | 'validation'
+  | 'forensics'
+  | 'face_verification'
+  | 'risk_assessment'
   | 'result';
 
 export interface ValidationCheck {
@@ -103,11 +114,19 @@ export interface RiskResult {
 }
 
 export interface ScreeningCase {
+  caseStatus?: CaseStatus;
+  selfie?: DocumentFile;
+  demo?: { scenarioId: string; inputSource: 'sample' | 'uploaded'; liveness: 'live' | 'spoof' | 'unknown' };
+  evidence?: EvidenceItem[];
+  officerReview?: OfficerReview;
   id: string;
   caseNumber: string;
   status: ScreeningStatus;
   riskLevel: RiskLevel;
-  riskScore: number;
+  riskScore: number | null;
+  subjectName?: string;
+  documentType?: string;
+  stepStatuses?: Record<ScreeningStep, StepStatus>;
   documents: DocumentFile[];
   ocrResult?: OCRResult;
   validationResult?: ValidationResult;

@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -149,3 +147,11 @@ body {
     }
   }
 }
+
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+main { overflow-wrap: anywhere; }
+.table-container { width: 100%; }
+.table { min-width: 640px; }
+
+main .grid > * { min-width: 0; }
+button, .btn { overflow-wrap: normal; }

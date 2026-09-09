@@ -1,4 +1,4 @@
-import { DocumentFile, DocumentType, OCRResult, ExtractedField, MRZData } from '../types';
+import type { DocumentFile, DocumentType, OCRResult, ExtractedField, MRZData } from '../types';
 
 export const demoDocuments: Record<string, DocumentFile> = {
   'genuine-passport': {

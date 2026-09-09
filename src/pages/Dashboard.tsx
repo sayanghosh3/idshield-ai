@@ -1,59 +1,39 @@
-import { Link } from 'react-router-dom';
-import { ArrowUpRight, ArrowDownRight, Minus, Users, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { useCases } from '../hooks/useCases';
+import { caseStatusVariants } from '../utils/casePresentation';
+import { Link, useNavigate } from 'react-router-dom';
+import { Minus, Users, AlertTriangle, CheckCircle, Clock, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
-import { mockScreeningCases } from '../mocks/screeningData';
+
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 import { StaggerContainer, FadeIn, AnimatedCard } from '../components/animations';
 
-const kpiCards = [
-  {
-    title: "Today's Screenings",
-    value: '127',
-    change: '+12%',
-    trend: 'up',
-    icon: Users,
-    color: 'text-primary-accent',
-    bg: 'bg-primary-accent/20',
-  },
-  {
-    title: 'High Risk',
-    value: '8',
-    change: '+3',
-    trend: 'up',
-    icon: AlertTriangle,
-    color: 'text-danger',
-    bg: 'bg-danger/20',
-  },
-  {
-    title: 'Review Required',
-    value: '19',
-    change: '-2',
-    trend: 'down',
-    icon: Clock,
-    color: 'text-warning',
-    bg: 'bg-warning/20',
-  },
-  {
-    title: 'Low Risk',
-    value: '100',
-    change: '+11',
-    trend: 'up',
-    icon: CheckCircle,
-    color: 'text-success',
-    bg: 'bg-success/20',
-  },
+const kpiTemplates = [
+  { title: 'Cases in this session', icon: Users, color: 'text-primary-accent', bg: 'bg-primary-accent/20' },
+  { title: 'High Risk', icon: AlertTriangle, color: 'text-danger', bg: 'bg-danger/20' },
+  { title: 'Moderate Risk', icon: Clock, color: 'text-warning', bg: 'bg-warning/20' },
+  { title: 'Low Risk', icon: CheckCircle, color: 'text-success', bg: 'bg-success/20' },
+  { title: 'Awaiting Review', icon: Clock, color: 'text-primary-accent', bg: 'bg-primary-accent/20' },
 ];
 
-const recentCases = mockScreeningCases.slice(0, 5);
+
 
 export function Dashboard() {
+  const navigate = useNavigate();
+  const { listItems } = useCases();
+  const recentCases = listItems.slice(0, 5);
+  const counts = [listItems.length, listItems.filter(item => item.riskLevel === 'high').length,
+    listItems.filter(item => item.riskLevel === 'review').length, listItems.filter(item => item.riskLevel === 'low').length,
+    listItems.filter(item => item.status === 'under_review').length];
+  const kpiCards = kpiTemplates.map((card, index) => ({ ...card, value: String(counts[index]),
+    title: card.title,
+    change: 'Demo records', trend: 'neutral' }));
   return (
     <div className="space-y-6">
       <FadeIn>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold text-text">Security Screening Dashboard</h1>
             <p className="text-muted-text mt-1">AI-assisted identity and document screening</p>
@@ -69,7 +49,7 @@ export function Dashboard() {
 
       <FadeIn delay={0.1}>
         <StaggerContainer staggerChildren={0.08} delayChildren={0.1}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             {kpiCards.map((kpi, index) => {
               const Icon = kpi.icon;
               const TrendIcon = kpi.trend === 'up' ? TrendingUp : kpi.trend === 'down' ? TrendingDown : Minus;
@@ -83,7 +63,7 @@ export function Dashboard() {
                         <span className={cn('text-sm font-medium', kpi.trend === 'up' && 'text-success', kpi.trend === 'down' && 'text-danger', kpi.trend === 'neutral' && 'text-muted-text')}>
                           <TrendIcon className="w-4 h-4 inline" /> {kpi.change}
                         </span>
-                        <span className="text-xs text-muted-text">vs last week</span>
+                        <span className="text-xs text-muted-text">in this session</span>
                       </div>
                     </div>
                     <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', kpi.bg)}>
@@ -111,12 +91,12 @@ export function Dashboard() {
                 { key: 'riskScore', header: 'Risk Score', render: (row) => (
                   <div className="flex items-center gap-2">
                     <span className={cn('font-mono font-medium', getRiskLevelColor(row.riskLevel))}>{formatScore(row.riskScore)}</span>
-                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : 'success'} size="sm">
+                    <Badge variant={row.riskLevel === 'high' ? 'danger' : row.riskLevel === 'review' ? 'warning' : row.riskLevel === 'low' ? 'success' : 'neutral'} size="sm">
                       {getRiskLevelLabel(row.riskLevel)}
                     </Badge>
                   </div>
                 )},
-                { key: 'status', header: 'Status', render: (row) => <Badge variant={row.status === 'failed' ? 'danger' : row.status === 'completed' ? 'success' : row.status === 'processing' ? 'warning' : 'info'}>{row.status.replace('_', ' ')}</Badge> },
+                { key: 'status', header: 'Status', render: (row) => <Badge variant={caseStatusVariants[row.status]}>{row.status.replace('_', ' ')}</Badge> },
                 { key: 'createdAt', header: 'Time', render: (row) => formatRelativeTime(row.createdAt) },
                 { key: 'action', header: 'Action', render: (row) => (
                   <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline text-sm font-medium">Open</Link>
@@ -125,7 +105,7 @@ export function Dashboard() {
               data={recentCases}
               keyExtractor={row => row.id}
               clickable
-              onRowClick={row => window.location.href = `/cases/${row.id}`}
+              onRowClick={row => navigate(`/cases/${row.id}`)}
               striped
             />
           </CardContent>
@@ -135,16 +115,16 @@ export function Dashboard() {
       <FadeIn delay={0.3}>
         <Card padding="md">
           <CardHeader>
-            <CardTitle>System Status</CardTitle>
+            <CardTitle>Demo Analysis Services</CardTitle>
           </CardHeader>
           <CardContent>
             <StaggerContainer staggerChildren={0.06} delayChildren={0.1}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { name: 'OCR Engine', status: 'operational', version: 'v2.3.1' },
-                  { name: 'Validation Service', status: 'operational', version: 'v3.0.0' },
-                  { name: 'Forensic Analyzer', status: 'operational', version: 'v1.5.2' },
-                  { name: 'Face Matcher', status: 'operational', version: 'v2.1.0' },
+                  { name: 'OCR Engine', status: 'simulated', version: 'Sample data' },
+                  { name: 'Validation Service', status: 'simulated', version: 'Sample data' },
+                  { name: 'Forensic Analyzer', status: 'simulated', version: 'Sample data' },
+                  { name: 'Face Matcher', status: 'simulated', version: 'Sample data' },
                 ].map((service, i) => (
                   <FadeIn key={i} delay={i * 0.06}>
                     <div className="flex items-center justify-between p-4 bg-panel-secondary rounded-lg">
@@ -155,7 +135,7 @@ export function Dashboard() {
                           <p className="text-xs text-muted-text">{service.version}</p>
                         </div>
                       </div>
-                      <Badge variant="success" size="sm">{service.status}</Badge>
+                      <Badge variant="info" size="sm">{service.status}</Badge>
                     </div>
                   </FadeIn>
                 ))}

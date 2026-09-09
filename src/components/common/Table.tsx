@@ -1,4 +1,4 @@
-import { forwardRef, HTMLAttributes, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 interface Column<T> {
@@ -7,6 +7,7 @@ interface Column<T> {
   render?: (row: T, index: number) => ReactNode;
   className?: string;
   width?: string;
+  sortable?: boolean;
 }
 
 interface TableProps<T> {
@@ -40,12 +41,11 @@ export function Table<T>({
   sortDirection,
   onSort,
 }: TableProps<T>) {
-  const sortableColumns = columns.filter(c => onSort);
 
   return (
-    <div className={cn('table-container', className)}>
+    <div className={cn('table-container max-w-full', className)}>
       {loading ? (
-        <div className="p-8 text-center text-muted-text">
+        <div role="status" className="p-8 text-center text-muted-text">
           <div className="animate-pulse-soft flex items-center justify-center gap-2">
             <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -55,7 +55,7 @@ export function Table<T>({
           </div>
         </div>
       ) : data.length === 0 ? (
-        <div className="p-8 text-center text-muted-text">{emptyMessage}</div>
+        <div role="status" className="p-8 text-center text-muted-text">{emptyMessage}</div>
       ) : (
         <table className="table" role="table">
           <thead>
@@ -66,11 +66,12 @@ export function Table<T>({
                   className={cn('px-4 py-3 text-left font-medium text-muted-text border-b border-border', column.className)}
                   style={{ width: column.width }}
                   scope="col"
+                  aria-sort={sortBy === column.key ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
-                  {onSort && (
+                  {onSort && column.sortable && (
                     <button
                       onClick={() => onSort(column.key)}
-                      className={cn('flex items-center gap-1.5 hover:text-text', sortableColumns.some(c => c.key === column.key) && 'cursor-pointer')}
+                      className="flex items-center gap-1.5 hover:text-text"
                     >
                       {column.header}
                       {sortBy === column.key && (
@@ -96,11 +97,14 @@ export function Table<T>({
                   hoverable && 'hover:bg-panel-secondary/50',
                   clickable && onRowClick && 'cursor-pointer clickable'
                 )}
-                onClick={() => clickable && onRowClick?.(row)}
+                onClick={event => {
+                  if ((event.target as Element).closest('a,button,input,select,textarea')) return;
+                  if (clickable) onRowClick?.(row);
+                }}
               >
                 {columns.map(column => (
                   <td key={column.key} className={cn('px-4 py-3 border-b border-border/50', column.className)}>
-                    {column.render ? column.render(row, rowIndex) : String((row as Record<string, unknown>)[column.key] || '')}
+                    {column.render ? column.render(row, rowIndex) : String((row as Record<string, unknown>)[column.key] ?? '')}
                   </td>
                 ))}
               </tr>
@@ -121,7 +125,7 @@ interface SimpleTableProps {
 
 export function SimpleTable({ headers, rows, className, striped = true }: SimpleTableProps) {
   return (
-    <div className={cn('table-container', className)}>
+    <div className={cn('table-container max-w-full', className)}>
       <table className="table">
         <thead>
           <tr>

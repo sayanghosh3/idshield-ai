@@ -1,4 +1,4 @@
-import { motion, HTMLMotionProps } from 'motion/react';
+import { motion, useReducedMotion, HTMLMotionProps } from 'motion/react';
 import { cn } from '../../utils/cn';
 
 interface FadeInProps extends Omit<HTMLMotionProps<'div'>, 'initial' | 'animate' | 'exit'> {
@@ -17,12 +17,13 @@ export function FadeIn({
   children, 
   ...props 
 }: FadeInProps) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
+      initial={reduced ? false : { opacity: 0, y }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -y }}
-      transition={{ duration, delay, ease: 'easeOut' }}
+      transition={{ duration: reduced ? 0 : duration, delay: reduced ? 0 : delay, ease: 'easeOut' }}
       className={cn(className)}
       {...props}
     >

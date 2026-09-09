@@ -27,10 +27,11 @@ export function Settings() {
       <FadeIn>
         <div>
           <h1 className="text-2xl font-bold text-text">Settings</h1>
-          <p className="text-muted-text">Configure system behavior and integrations</p>
+          <p className="text-muted-text">Preview future system configuration and integrations</p>
         </div>
       </FadeIn>
 
+      <p role="note" className="rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">Configuration preview only. These controls do not configure live services, security policies, or persistent settings. The working demo is controlled from New Screening.</p>
       <FadeIn delay={0.1}>
         <Card padding="none">
           <CardContent className="p-0">
@@ -71,7 +72,7 @@ export function Settings() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.2 }}
-                  className="flex-1 p-6 lg:p-8 overflow-y-auto"
+                  className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto"
                 >
                   {activeTab === 'system' && <SystemSettings />}
                   {activeTab === 'ai' && <AISettings />}
@@ -143,17 +144,17 @@ function SystemSettings() {
           </div>
           <div className="bg-panel-secondary rounded-lg p-4">
             <p className="text-sm text-muted-text">Build Date</p>
-            <p className="font-mono text-text">2026-01-15</p>
+            <p className="font-mono text-text">Not supplied</p>
           </div>
           <div className="bg-panel-secondary rounded-lg p-4">
             <p className="text-sm text-muted-text">Node Version</p>
-            <p className="font-mono text-text">v24.19.0</p>
+            <p className="font-mono text-text">Not available in browser</p>
           </div>
         </div>
       </div>
 
       <div className="pt-6 border-t border-border flex justify-end">
-        <Button variant="primary"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
+        <Button variant="primary" disabled title="Backend configuration is not connected"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
       </div>
     </div>
   );
@@ -241,7 +242,7 @@ function AISettings() {
       </div>
 
       <div className="pt-6 border-t border-border flex justify-end">
-        <Button variant="primary"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
+        <Button variant="primary" disabled title="Backend configuration is not connected"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
       </div>
     </div>
   );
@@ -270,7 +271,7 @@ function ThresholdSettings() {
       </div>
 
       <div className="pt-6 border-t border-border flex justify-end">
-        <Button variant="primary"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
+        <Button variant="primary" disabled title="Backend configuration is not connected"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
       </div>
     </div>
   );
@@ -347,7 +348,7 @@ function DocumentSettings() {
       </div>
 
       <div className="pt-6 border-t border-border flex justify-end">
-        <Button variant="primary"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
+        <Button variant="primary" disabled title="Backend configuration is not connected"><Save className="w-4 h-4 mr-2" /> Save Changes</Button>
       </div>
     </div>
   );
@@ -401,7 +402,7 @@ function SecuritySettings() {
             label="Two-Factor Authentication"
             description="Require 2FA for all operator accounts"
             action={
-              <Button variant="ghost" onClick={() => {}}>
+              <Button variant="ghost" disabled title="Not connected in this frontend demo">
                 <ToggleLeft className="w-5 h-5" />
               </Button>
             }
@@ -410,7 +411,7 @@ function SecuritySettings() {
             label="Session Timeout"
             description="Auto-logout after 30 minutes of inactivity"
             action={
-              <Button variant="primary" onClick={() => {}}>
+              <Button variant="primary" disabled title="Not connected in this frontend demo">
                 <ToggleRight className="w-5 h-5" />
               </Button>
             }
@@ -419,7 +420,7 @@ function SecuritySettings() {
             label="Audit Logging"
             description="Log all system and user actions"
             action={
-              <Button variant="primary" onClick={() => {}}>
+              <Button variant="primary" disabled title="Not connected in this frontend demo">
                 <ToggleRight className="w-5 h-5" />
               </Button>
             }
@@ -428,7 +429,7 @@ function SecuritySettings() {
             label="Data Encryption"
             description="Encrypt all stored documents and data"
             action={
-              <Button variant="primary" onClick={() => {}}>
+              <Button variant="primary" disabled title="Not connected in this frontend demo">
                 <ToggleRight className="w-5 h-5" />
               </Button>
             }
@@ -442,7 +443,7 @@ function SecuritySettings() {
           <p>• No real identity documents should be uploaded in demo mode</p>
           <p>• All uploaded files are stored temporarily in browser memory only</p>
           <p>• No data is transmitted to external services in demo mode</p>
-          <p>• Audit logs are retained for 90 days</p>
+          <p>• Cases and audit logs exist only in this browser session; refreshing clears new demo records.</p>
         </div>
       </div>
     </div>

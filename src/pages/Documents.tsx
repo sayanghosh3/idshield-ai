@@ -1,3 +1,6 @@
+import { useNavigate } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
+import { DocumentPreview } from '../components/common/DocumentPreview';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Image, Search, Filter, ChevronDown, Eye, Download, Trash2 } from 'lucide-react';
@@ -7,14 +10,15 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Table } from '../components/common/Table';
 import { Input } from '../components/common/Input';
-import { demoDocuments } from '../mocks/documents';
 import { formatFileSize, formatRelativeTime } from '../utils/formatters';
 import { FadeIn, StaggerContainer } from '../components/animations';
 
-const allDocuments = Object.values(demoDocuments);
+
 
 export function Documents() {
-  console.log("DOCUMENTS PAGE LOADED");
+  const navigate = useNavigate();
+  const { cases } = useCases();
+  const allDocuments = cases.flatMap(record => record.documents.map(document => ({ ...document, caseId: record.id, caseNumber: record.caseNumber, rowId: record.id + ':' + document.id })));
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
@@ -33,7 +37,7 @@ export function Documents() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-text">Document Analysis</h1>
-            <p className="text-muted-text">Browse and analyze uploaded documents</p>
+            <p className="text-muted-text">Documents linked to the same screening cases — open a record to review OCR, MRZ and validation.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 border border-border rounded-lg p-1">
@@ -85,21 +89,20 @@ export function Documents() {
             <CardContent className="p-0">
               <Table
                 columns={[
-                  { key: 'preview', header: '', render: (row) => <img src={row.preview} alt={row.name} className="w-12 h-8 rounded object-cover" /> },
+                  { key: 'preview', header: '', render: (row) => <DocumentPreview document={row} className="w-24 min-h-16" /> },
                   { key: 'name', header: 'File Name', className: 'font-medium' },
+                  { key: 'caseNumber', header: 'Case ID' },
                   { key: 'documentType', header: 'Type', render: (row) => <Badge variant="info" size="sm">{row.documentType.replace('_', ' ')}</Badge> },
                   { key: 'size', header: 'Size', render: (row) => formatFileSize(row.size) },
                   { key: 'uploadedAt', header: 'Uploaded', render: (row) => formatRelativeTime(row.uploadedAt) },
                   { key: 'actions', header: 'Actions', render: (row) => (
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="sm" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}><Eye className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="sm" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}><Download className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="sm" className="text-danger" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}><Trash2 className="w-4 h-4" /></Button>
+                      <Button aria-label="Open document analysis" onClick={() => navigate(`/cases/${row.caseId}?tab=document`)} variant="ghost" size="sm" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}><Eye className="w-4 h-4" /></Button>
                     </div>
                   )},
                 ]}
                 data={filteredDocuments}
-                keyExtractor={row => row.id}
+                keyExtractor={row => row.rowId}
                 striped
               />
             </CardContent>
@@ -108,14 +111,14 @@ export function Documents() {
           <StaggerContainer staggerChildren={0.06}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredDocuments.map(doc => (
-                <FadeIn key={doc.id} y={16}>
+                <FadeIn key={doc.rowId} y={16}>
                   <motion.div
                     whileHover={{ y: -4, boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.2)' }}
                     transition={{ duration: 0.2 }}
                   >
                     <Card padding="md" className="flex flex-col">
                       <div className="aspect-video bg-panel-secondary rounded-lg overflow-hidden mb-3 relative">
-                        <img src={doc.preview} alt={doc.name} className="w-full h-full object-cover" />
+                        <DocumentPreview document={doc} className="w-full h-full" />
                         <Badge variant="info" className="absolute top-2 right-2">{doc.documentType.replace('_', ' ')}</Badge>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -123,8 +126,7 @@ export function Documents() {
                         <p className="text-xs text-muted-text">{formatFileSize(doc.size)} • {formatRelativeTime(doc.uploadedAt)}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border/50">
-                        <Button variant="ghost" size="sm" className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}><Eye className="w-4 h-4 mr-1" /> View</Button>
-                        <Button variant="ghost" size="sm" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}><Download className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => navigate(`/cases/${doc.caseId}?tab=document`)}><Eye className="w-4 h-4 mr-1" /> View</Button>
                       </div>
                     </Card>
                   </motion.div>

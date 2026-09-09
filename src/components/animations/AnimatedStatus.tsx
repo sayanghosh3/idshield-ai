@@ -1,13 +1,16 @@
 import { motion, HTMLMotionProps } from 'motion/react';
+import type { StepStatus } from '../../types/screening';
+import { normalizeStepStatus } from '../../utils/screeningStatus';
 import { cn } from '../../utils/cn';
 
 interface AnimatedStatusProps extends Omit<HTMLMotionProps<'span'>, 'initial' | 'animate'> {
-  status: 'completed' | 'processing' | 'pending' | 'failed';
+  status: StepStatus;
   className?: string;
   children?: React.ReactNode;
 }
 
 const statusVariants = {
+  skipped: { initial: { opacity: 1 }, animate: { opacity: 1 } },
   completed: {
     initial: { opacity: 0, scale: 0.8 },
     animate: { opacity: 1, scale: 1 },
@@ -27,6 +30,7 @@ const statusVariants = {
 };
 
 const statusIcons = {
+  skipped: <span className="w-4 h-4 text-center">−</span>,
   completed: (
     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -49,6 +53,7 @@ const statusIcons = {
 };
 
 const statusColors = {
+  skipped: 'text-muted-text',
   completed: 'text-success',
   processing: 'text-primary-accent',
   pending: 'text-muted-text',
@@ -61,12 +66,14 @@ export function AnimatedStatus({
   children,
   ...props
 }: AnimatedStatusProps) {
-  const variant = statusVariants[status] ?? statusVariants.pending;
-  const Icon = statusIcons[status] ?? statusIcons.pending;
-  const colorClass = statusColors[status] ?? statusColors.pending;
+  const safeStatus = normalizeStepStatus(status);
+  const variant = statusVariants[safeStatus];
+  const Icon = statusIcons[safeStatus];
+  const colorClass = statusColors[safeStatus];
 
   return (
     <motion.span
+      aria-label={safeStatus}
       initial={variant.initial}
       animate={variant.animate}
       transition={{ duration: 0.2, ease: 'easeOut' }}

@@ -1,7 +1,7 @@
-import { 
-  ScreeningCase, 
-  ScreeningStatus, 
-  RiskLevel, 
+import type {
+  ScreeningCase,
+  ScreeningStatus,
+  RiskLevel,
   ScreeningStep,
   ValidationResult,
   ValidationCheck,
@@ -12,7 +12,7 @@ import {
   RiskContributor,
   ScreeningProgress
 } from '../types';
-import { demoDocuments, demoOCRResults } from './documents';
+import { demoDocuments, demoOCRResults } from './documents.ts';
 
 export const demoScenarios = [
   {
@@ -69,41 +69,41 @@ const createValidationResult = (scenarioId: string): ValidationResult => {
     { id: 'v8', category: 'Dates', name: 'Expiry date validity', description: 'Expiry date is in the future', status: 'pass' },
     { id: 'v9', category: 'Cross-document Consistency', name: 'Internal data consistency', description: 'OCR and MRZ data match across fields', status: 'pass' },
     { id: 'v10', category: 'Expiry', name: 'Document not expired', description: 'Document expiry date is in the future', status: 'pass' },
-    { id: 'v11', category: 'Watchlist', name: 'Watchlist check', description: 'Subject not found on sanctions/watchlists', status: 'not_checked' },
+    { id: 'v11', category: 'Watchlist', name: 'Watchlist check', description: 'Unavailable in this demo; no government database or watchlist is connected', status: 'not_checked' },
   ];
 
   switch (scenarioId) {
     case 'expired-passport':
       return {
         checks: baseChecks.map(c => c.id === 'v8' || c.id === 'v10' ? { ...c, status: 'fail' as const, description: c.description + ' — Document expired on 15 MAR 2020' } : c),
-        passed: 7, warnings: 0, failed: 2, notChecked: 2, overallStatus: 'fail',
+        passed: 8, warnings: 0, failed: 2, notChecked: 1, overallStatus: 'fail',
       };
     case 'tampered-passport':
       return {
         checks: baseChecks.map(c => {
-          if (c.id === 'v9') return { ...c, status: 'fail' as const, description: 'OCR DOB (22 AUG 1990) does not match MRZ DOB (22 AUG 1990) — Visual anomaly detected' };
+          if (c.id === 'v9') return { ...c, status: 'pass' as const, description: 'OCR and MRZ DOB values agree (22 AUG 1990); typography anomalies are recorded by the forensic check' };
           if (c.id === 'v3') return { ...c, status: 'warning' as const, description: 'Passport number format valid but font anomalies detected' };
           return c;
         }),
-        passed: 6, warnings: 1, failed: 1, notChecked: 2, overallStatus: 'fail',
+        passed: 9, warnings: 1, failed: 0, notChecked: 1, overallStatus: 'warning',
       };
     case 'face-mismatch':
       return {
         checks: baseChecks.map(c => c),
-        passed: 8, warnings: 0, failed: 0, notChecked: 2, overallStatus: 'pass',
+        passed: 10, warnings: 0, failed: 0, notChecked: 1, overallStatus: 'pass',
       };
     case 'cross-mismatch':
       return {
         checks: baseChecks.map(c => {
-          if (c.id === 'v9') return { ...c, status: 'fail' as const, description: 'Visa passport number (X9999999) does not match passport record (X1234567)' };
+          if (c.id === 'v9') return { ...c, status: 'fail' as const, description: 'Visa passport number (X9999999) does not match paired demo passport (X1234567)' };
           return c;
         }),
-        passed: 7, warnings: 0, failed: 1, notChecked: 2, overallStatus: 'fail',
+        passed: 9, warnings: 0, failed: 1, notChecked: 1, overallStatus: 'fail',
       };
     default:
       return {
         checks: baseChecks,
-        passed: 8, warnings: 0, failed: 0, notChecked: 2, overallStatus: 'pass',
+        passed: 10, warnings: 0, failed: 0, notChecked: 1, overallStatus: 'pass',
       };
   }
 };
@@ -205,14 +205,14 @@ const createRiskResult = (scenarioId: string, riskScore: number, riskLevel: Risk
     case 'tampered-passport':
       contributors = [
         { id: 'r1', factor: 'Possible photo manipulation', description: 'Edge inconsistencies and lighting mismatch in photo', impact: 35, type: 'negative', category: 'tampering' },
-        { id: 'r2', factor: 'MRZ mismatch', description: 'OCR DOB does not match MRZ DOB', impact: 25, type: 'negative', category: 'document' },
+        { id: 'r2', factor: 'DOB field typography', description: 'Simulated font anomalies in the DOB field; OCR and MRZ values agree', impact: 25, type: 'negative', category: 'tampering' },
         { id: 'r3', factor: 'Document inconsistency', description: 'Font anomalies and stamp irregularities', impact: 20, type: 'negative', category: 'tampering' },
         { id: 'r4', factor: 'Metadata anomaly', description: 'EXIF creation date differs from issue date', impact: 10, type: 'negative', category: 'tampering' },
         { id: 'r5', factor: 'Face match', description: 'Face verification passed', impact: -8, type: 'positive', category: 'face' },
       ];
       explanation = [
         'Passport photograph shows possible manipulation — edge inconsistencies and lighting mismatch detected.',
-        'OCR Date of Birth (22 AUG 1990) does not match MRZ Date of Birth (22 AUG 1990) — visual anomaly in DOB field.',
+        'OCR and MRZ Date of Birth agree (22 AUG 1990); forensic checks flag typography anomalies in the DOB field.',
         'Font anomalies detected in Date of Birth field — inconsistent kerning and baseline shift.',
         'Official stamp shows pixelation inconsistent with surrounding document areas.',
         'Metadata creation date (2024) conflicts with document issue date (2018).',
@@ -242,7 +242,7 @@ const createRiskResult = (scenarioId: string, riskScore: number, riskLevel: Risk
         { id: 'r4', factor: 'Document validity', description: 'Visa format and other fields valid', impact: -5, type: 'positive', category: 'document' },
       ];
       explanation = [
-        'Visa passport number (X9999999) does not match the passport on record (X1234567).',
+        'Visa passport number (X9999999) does not match the paired demo passport (X1234567).',
         'Compression analysis suggests document may have been reassembled.',
         'Metadata indicates multiple editing sessions.',
         'Face verification passed with 94.1% similarity.',
@@ -265,12 +265,15 @@ const createRiskResult = (scenarioId: string, riskScore: number, riskLevel: Risk
     contributors,
     explanation,
     recommendation,
-    calculatedAt: new Date(),
+    calculatedAt: new Date('2026-01-15T20:31:24Z'),
   };
 };
 
 export const createDemoCase = (scenarioId: string): ScreeningCase => {
-  const scenario = demoScenarios.find(s => s.id === scenarioId)!;
+  const scenario = demoScenarios.find(s => s.id === scenarioId);
+  if (!scenario) throw new Error('Unknown scenario: ' + scenarioId);
+  const numbers: Record<string, number> = { 'tampered-passport': 1, 'genuine-passport': 2, 'expired-passport': 3, 'face-mismatch': 4, 'cross-mismatch': 5 };
+  const number = numbers[scenarioId];
   const document = demoDocuments[scenario.documentKey];
   const ocrResult = demoOCRResults[scenario.documentKey];
   const validationResult = createValidationResult(scenarioId);
@@ -279,9 +282,12 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
   const riskResult = createRiskResult(scenarioId, scenario.riskScore, scenario.riskLevel);
 
   return {
-    id: `case-${scenarioId}-${Date.now()}`,
-    caseNumber: `ID-2026-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`,
+    id: `case-${number}`,
+    caseNumber: `ID-2026-${String(number).padStart(3, '0')}`,
     status: 'completed' as ScreeningStatus,
+    subjectName: ocrResult.extractedFields.find(field => field.key === 'fullName')?.value ?? 'Unknown',
+    documentType: document.documentType,
+    stepStatuses: { upload: 'completed', extraction: 'completed', validation: 'completed', forensics: 'completed', face_verification: 'completed', risk_assessment: 'completed', result: 'completed' },
     riskLevel: scenario.riskLevel,
     riskScore: scenario.riskScore,
     documents: [document],
@@ -291,9 +297,9 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
     faceResult,
     riskResult,
     currentStep: 'result' as ScreeningStep,
-    createdAt: new Date(Date.now() - Math.random() * 86400000),
-    updatedAt: new Date(),
-    completedAt: new Date(),
+    createdAt: new Date('2026-01-15T20:31:00Z'),
+    updatedAt: new Date('2026-01-15T20:31:24Z'),
+    completedAt: new Date('2026-01-15T20:31:24Z'),
     assignedOperator: 'Security Operator',
     tags: [scenarioId],
   };
@@ -302,13 +308,13 @@ export const createDemoCase = (scenarioId: string): ScreeningCase => {
 export const mockScreeningCases: ScreeningCase[] = demoScenarios.map(s => createDemoCase(s.id));
 
 export const mockScreeningProgress: ScreeningProgress[] = [
-  { step: 'upload', progress: 100, message: 'Document uploaded successfully', startedAt: new Date(), completedAt: new Date() },
-  { step: 'extraction', progress: 100, message: 'OCR extraction completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'validation', progress: 100, message: 'Document validation completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'forensics', progress: 100, message: 'Tampering analysis completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'face_verification', progress: 100, message: 'Face verification completed', startedAt: new Date(), completedAt: new Date() },
-  { step: 'risk_assessment', progress: 100, message: 'Risk score calculated', startedAt: new Date(), completedAt: new Date() },
-  { step: 'result', progress: 100, message: 'Screening result generated', startedAt: new Date(), completedAt: new Date() },
+  { step: 'upload', progress: 100, message: 'Document uploaded successfully', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'extraction', progress: 100, message: 'OCR extraction completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'validation', progress: 100, message: 'Document validation completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'forensics', progress: 100, message: 'Tampering analysis completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'face_verification', progress: 100, message: 'Face verification completed', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'risk_assessment', progress: 100, message: 'Risk score calculated', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
+  { step: 'result', progress: 100, message: 'Screening result generated', startedAt: new Date('2026-01-15T20:31:24Z'), completedAt: new Date('2026-01-15T20:31:24Z') },
 ];
 
 export const screeningSteps: { step: ScreeningStep; label: string; number: string }[] = [

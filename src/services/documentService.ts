@@ -47,7 +47,9 @@ export const documentService = {
   async getDocument(documentId: string): Promise<DocumentFile> {
     if (DEMO_MODE) {
       await delay(100);
-      return Object.values(demoDocuments).find(d => d.id === documentId) || demoDocuments['genuine-passport'];
+      const document = Object.values(demoDocuments).find(d => d.id === documentId);
+      if (!document) throw new Error('Document not found');
+      return document;
     }
 
     const response = await apiRequest<DocumentFile>(`${API_ENDPOINTS.documents}/${documentId}`);
@@ -68,9 +70,9 @@ export const documentService = {
   async extractOCR(documentId: string, documentType: DocumentType): Promise<OCRResult> {
     if (DEMO_MODE) {
       await delay(SIMULATED_DELAY * 2);
-      return Object.values(demoOCRResults).find(r => 
-        demoDocuments[Object.keys(demoDocuments).find(k => demoDocuments[k].id === documentId) || '']?.documentType === documentType
-      ) || demoOCRResults['genuine-passport'];
+      const key = Object.keys(demoDocuments).find(key => demoDocuments[key].id === documentId && demoDocuments[key].documentType === documentType);
+      if (!key || !demoOCRResults[key]) throw new Error('No OCR result available for this document');
+      return demoOCRResults[key];
     }
 
     const response = await apiRequest<OCRResult>(API_ENDPOINTS.ocr, {

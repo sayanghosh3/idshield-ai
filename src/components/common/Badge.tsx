@@ -42,14 +42,14 @@ export const Badge = ({ className, variant = 'default', size = 'md', dot, childr
 export const StatusBadge = ({ status, dot = true }: { status: string; dot?: boolean }) => {
   const statusLower = status.toLowerCase();
   let variant: BadgeProps['variant'] = 'neutral';
-  
-  if (statusLower.includes('pass') || statusLower === 'success' || statusLower === 'clean' || statusLower === 'match' || statusLower === 'live') {
+
+  if (statusLower === 'pass' || statusLower === 'success' || statusLower === 'clean' || statusLower === 'match' || statusLower === 'live') {
     variant = 'success';
-  } else if (statusLower.includes('warn') || statusLower === 'warning' || statusLower === 'suspicious' || statusLower === 'review') {
+  } else if (statusLower === 'warning' || statusLower === 'warning' || statusLower === 'suspicious' || statusLower === 'review') {
     variant = 'warning';
-  } else if (statusLower.includes('fail') || statusLower === 'error' || statusLower === 'tampered' || statusLower === 'mismatch' || statusLower === 'spoof') {
+  } else if (statusLower === 'fail' || statusLower === 'error' || statusLower === 'tampered' || statusLower === 'mismatch' || statusLower === 'spoof') {
     variant = 'danger';
-  } else if (statusLower.includes('pending') || statusLower === 'not_checked' || statusLower === 'unknown' || statusLower === 'backend_required') {
+  } else if (statusLower === 'pending' || statusLower === 'not_checked' || statusLower === 'unknown' || statusLower === 'backend_required') {
     variant = 'info';
   }
 

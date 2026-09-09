@@ -1,4 +1,4 @@
-import { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
+import { forwardRef, useId, InputHTMLAttributes, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -8,20 +8,25 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, error, label, hint, ...props }, ref) => (
+  ({ className, error, label, hint, ...props }, ref) => {
+    const generatedId = useId();
+    const id = props.id ?? generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="label">{label}</label>}
+      {label && <label htmlFor={id} className="label">{label}</label>}
       <input
         ref={ref}
+        id={id}
         className={cn('input', error && 'border-danger focus:ring-danger', className)}
         aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={error ? `${props.id}-error` : hint ? `${props.id}-hint` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         {...props}
       />
-      {error && <p id={`${props.id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
-      {hint && !error && <p id={`${props.id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
+      {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
+      {hint && !error && <p id={`${id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
     </div>
-  )
+  );
+  }
 );
 
 Input.displayName = 'Input';
@@ -33,20 +38,25 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 }
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, error, label, hint, ...props }, ref) => (
+  ({ className, error, label, hint, ...props }, ref) => {
+    const generatedId = useId();
+    const id = props.id ?? generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="label">{label}</label>}
+      {label && <label htmlFor={id} className="label">{label}</label>}
       <textarea
         ref={ref}
+        id={id}
         className={cn('input min-h-[100px] resize-y', error && 'border-danger focus:ring-danger', className)}
         aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={error ? `${props.id}-error` : hint ? `${props.id}-hint` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         {...props}
       />
-      {error && <p id={`${props.id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
-      {hint && !error && <p id={`${props.id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
+      {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
+      {hint && !error && <p id={`${id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
     </div>
-  )
+  );
+  }
 );
 
 Textarea.displayName = 'Textarea';
@@ -59,14 +69,18 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, error, label, hint, options, ...props }, ref) => (
+  ({ className, error, label, hint, options, ...props }, ref) => {
+    const generatedId = useId();
+    const id = props.id ?? generatedId;
+    return (
     <div className="w-full">
-      {label && <label className="label">{label}</label>}
+      {label && <label htmlFor={id} className="label">{label}</label>}
       <select
         ref={ref}
+        id={id}
         className={cn('input', error && 'border-danger focus:ring-danger', className)}
         aria-invalid={error ? 'true' : 'false'}
-        aria-describedby={error ? `${props.id}-error` : hint ? `${props.id}-hint` : undefined}
+        aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         {...props}
       >
         {options?.map(opt => (
@@ -75,10 +89,11 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </option>
         ))}
       </select>
-      {error && <p id={`${props.id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
-      {hint && !error && <p id={`${props.id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
+      {error && <p id={`${id}-error`} className="mt-1 text-sm text-danger" role="alert">{error}</p>}
+      {hint && !error && <p id={`${id}-hint`} className="mt-1 text-sm text-muted-text">{hint}</p>}
     </div>
-  )
+  );
+  }
 );
 
 Select.displayName = 'Select';

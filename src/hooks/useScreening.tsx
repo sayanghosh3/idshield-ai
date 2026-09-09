@@ -1,7 +1,7 @@
-import { createContext, useContext, useReducer, useCallback, useMemo, ReactNode } from 'react';
-import { 
-  ScreeningCase, 
-  ScreeningStep, 
+import { createContext, useContext, useReducer, useMemo, ReactNode } from 'react';
+import {
+  ScreeningCase,
+  ScreeningStep,
   ScreeningStatus,
   RiskLevel,
   DocumentFile,
@@ -110,8 +110,9 @@ function screeningReducer(state: ScreeningState, action: ScreeningAction): Scree
         riskResult: action.payload.riskResult || null,
         screeningStatus: action.payload.status,
         currentStep: action.payload.currentStep,
-        progress: 100,
-        progressMessage: 'Demo scenario loaded',
+        progress: Object.values(action.payload.stepStatuses ?? {}).filter(status => status === 'completed').length * 100 / 7,
+        progressMessage: action.payload.status === 'completed' ? 'Screening completed (demo)' : action.payload.status,
+
         error: null,
       };
     default:
