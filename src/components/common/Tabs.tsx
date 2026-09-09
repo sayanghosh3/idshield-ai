@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useId, ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 
 interface TabsContextType {
+  id: string;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   variant: 'line' | 'enclosed' | 'soft';
@@ -19,6 +20,7 @@ interface TabsProps {
 }
 
 export function Tabs({ defaultValue, value, onChange, children, variant = 'line', className }: TabsProps) {
+  const id = useId();
   const [activeTab, setActiveTab] = useState(defaultValue);
   const controlled = value !== undefined;
   const currentTab = controlled ? value : activeTab;
@@ -29,7 +31,7 @@ export function Tabs({ defaultValue, value, onChange, children, variant = 'line'
   }, [controlled, onChange]);
 
   return (
-    <TabsContext.Provider value={{ activeTab: currentTab, setActiveTab: handleSetActiveTab, variant }}>
+    <TabsContext.Provider value={{ id, activeTab: currentTab, setActiveTab: handleSetActiveTab, variant }}>
       <div className={cn(className)}>{children}</div>
     </TabsContext.Provider>
   );
@@ -47,7 +49,7 @@ export function TabsList({ children, className, 'aria-label': ariaLabel }: TabsL
       role="tablist"
       aria-label={ariaLabel}
       className={cn(
-        'flex gap-1',
+        'flex gap-1 max-w-full overflow-x-auto',
         className
       )}
     >
@@ -66,7 +68,7 @@ interface TabTriggerProps {
 export function TabTrigger({ value, children, disabled, className }: TabTriggerProps) {
   const context = useContext(TabsContext);
   if (!context) throw new Error('TabTrigger must be used within Tabs');
-  const { activeTab, setActiveTab, variant } = context;
+  const { id, activeTab, setActiveTab, variant } = context;
 
   const isActive = activeTab === value;
 
@@ -85,13 +87,22 @@ export function TabTrigger({ value, children, disabled, className }: TabTriggerP
   return (
     <button
       role="tab"
+      type="button"
+      tabIndex={isActive ? 0 : -1}
+      onKeyDown={event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        const tabs = Array.from(event.currentTarget.closest('[role="tablist"]')?.querySelectorAll<HTMLButtonElement>('[role="tab"]:not([disabled])') ?? []);
+        const index = tabs.indexOf(event.currentTarget);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        event.preventDefault(); tabs[next]?.focus(); tabs[next]?.click();
+      }}
       aria-selected={isActive}
-      aria-controls={`panel-${value}`}
-      id={`tab-${value}`}
+      aria-controls={`${id}-panel-${value}`}
+      id={`${id}-tab-${value}`}
       disabled={disabled}
       onClick={() => !disabled && setActiveTab(value)}
       className={cn(
-        'px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed',
+        'shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-accent focus:ring-offset-2 focus:ring-offset-background disabled:opacity-50 disabled:cursor-not-allowed',
         variants[variant],
         className
       )}
@@ -110,15 +121,15 @@ interface TabContentProps {
 export function TabContent({ value, children, className }: TabContentProps) {
   const context = useContext(TabsContext);
   if (!context) throw new Error('TabContent must be used within Tabs');
-  const { activeTab } = context;
+  const { id, activeTab } = context;
 
   if (activeTab !== value) return null;
 
   return (
     <div
       role="tabpanel"
-      id={`panel-${value}`}
-      aria-labelledby={`tab-${value}`}
+      id={`${id}-panel-${value}`}
+      aria-labelledby={`${id}-tab-${value}`}
       className={cn('mt-4 animate-fade-in', className)}
     >
       {children}

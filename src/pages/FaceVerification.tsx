@@ -1,3 +1,7 @@
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCases } from '../hooks/useCases';
+import { DemoCaseContext } from '../components/common/DemoCaseContext';
+import { DocumentPreview } from '../components/common/DocumentPreview';
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Upload, RotateCcw, Eye, CheckCircle, XCircle, AlertCircle, FileText } from 'lucide-react';
@@ -12,8 +16,12 @@ import { FadeIn, StaggerContainer, AnimatedNumber } from '../components/animatio
 export function FaceVerification() {
   const [documentImage, setDocumentImage] = useState<File | null>(null);
   const [presentedImage, setPresentedImage] = useState<File | null>(null);
-  const [result, setResult] = useState<any>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { cases } = useCases();
+  const selectedCase = cases.find(record => record.id === searchParams.get('caseId'));
+  const result = selectedCase?.faceResult;
+  const isProcessing = false;
 
   const {
     files: docFiles,
@@ -46,27 +54,15 @@ export function FaceVerification() {
   const docPreview = useImagePreview(docFiles[0] || null);
   const presPreview = useImagePreview(presFiles[0] || null);
 
-  const handleVerify = async () => {
+  const handleVerify = () => {
     if (!docFiles[0] || !presFiles[0]) return;
-    
-    setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setResult({
-      documentFace: { detected: true, boundingBox: { x: 0.15, y: 0.12, width: 0.28, height: 0.35 }, qualityScore: 92 },
-      presentedFace: { detected: true, boundingBox: { x: 0.35, y: 0.10, width: 0.30, height: 0.38 }, qualityScore: 88, livenessStatus: 'backend_required' },
-      similarity: 96.8,
-      decision: 'match',
-      threshold: 85,
-      analysisTime: 1560,
-    });
-    setIsProcessing(false);
+    navigate('/screening', { state: { documentFiles: [docFiles[0]], selfieFiles: [presFiles[0]] } });
   };
 
   const handleReset = () => {
     clearDocFiles();
     clearPresFiles();
-    setResult(null);
+    setSearchParams({});
   };
 
 return (
@@ -78,7 +74,20 @@ return (
         </div>
       </FadeIn>
 
-      <FadeIn delay={0.1}>
+      <Card padding="md" className="space-y-3">
+        <label className="block label">View an existing case
+          <select className="input mt-1" value={selectedCase?.id ?? ''} onChange={event => setSearchParams(event.target.value ? { caseId: event.target.value } : {})}>
+            <option value="">New document / selfie input</option>
+            {cases.filter(record => record.faceResult).map(record => <option key={record.id} value={record.id}>{record.caseNumber} — {record.subjectName}</option>)}
+          </select>
+        </label>
+        <p className="text-sm text-muted-text">Face similarity and liveness are simulated case outcomes. Uploaded photos are passed to the full demo screening flow, not independently scored here.</p>
+        {searchParams.get('caseId') && !selectedCase && <p role="alert" className="text-danger">Case not found. Choose an existing case or start a new screening.</p>}
+        <Link className="text-primary-accent" to="/screening">Start with a sample pair</Link>
+      </Card>
+      {selectedCase && <DemoCaseContext record={selectedCase} />}
+
+      {!selectedCase && <FadeIn delay={0.1}>
         <StaggerContainer staggerChildren={0.08}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <FadeIn y={16}>
@@ -202,7 +211,7 @@ return (
             </FadeIn>
           </div>
         </StaggerContainer>
-      </FadeIn>
+      </FadeIn>}
 
       <FadeIn delay={0.2}>
         <Card padding="lg">
@@ -217,7 +226,7 @@ return (
                     <div className="text-center">
                       <h4 className="font-medium text-text mb-3">Document Face</h4>
                       <div className="bg-panel-secondary rounded-lg p-4 min-h-[200px] flex items-center justify-center relative mb-3">
-                        {docPreview && <img src={docPreview} alt="Document face" className="w-40 h-40 rounded-lg object-cover" />}
+                        <DocumentPreview document={selectedCase?.documents[0]} className="w-40 min-h-40 object-contain" />
                         {result.documentFace.boundingBox && (
                           <motion.div
                             className="absolute border-2 border-primary-accent"
@@ -241,17 +250,17 @@ return (
 
                     <div className="flex flex-col items-center justify-center">
                       <AnimatedNumber value={result.similarity} maxValue={100} duration={0.8} className="text-5xl font-bold" style={{ color: result.decision === 'match' ? '#22C55E' : '#EF4444' }} decimals={1} suffix="%" />
-                      <Badge variant={result.decision === 'match' ? 'success' : 'danger'} size="lg">
-                        {result.decision === 'match' ? 'MATCH' : 'MISMATCH'}
+                      <Badge variant={result.decision === 'match' ? 'success' : result.decision === 'mismatch' ? 'danger' : 'warning'} size="lg">
+                        {result.decision.toUpperCase()}
                       </Badge>
                       <p className="text-sm text-muted-text mt-2">Threshold: {result.threshold}%</p>
-                      <Progress value={result.similarity} max={100} size="md" showLabel variant={result.decision === 'match' ? 'success' : 'danger'} className="mt-4 w-64" />
+                      <Progress value={result.similarity} max={100} size="md" showLabel variant={result.decision === 'match' ? 'success' : result.decision === 'mismatch' ? 'danger' : 'warning'} className="mt-4 w-64" />
                     </div>
 
                     <div className="text-center">
                       <h4 className="font-medium text-text mb-3">Presented Person</h4>
                       <div className="bg-panel-secondary rounded-lg p-4 min-h-[200px] flex items-center justify-center relative mb-3">
-                        {presPreview && <img src={presPreview} alt="Presented person" className="w-40 h-40 rounded-lg object-cover" />}
+                        <DocumentPreview document={selectedCase?.selfie} className="w-40 min-h-40 object-contain" />
                         {result.presentedFace.boundingBox && (
                           <motion.div
                             className="absolute border-2 border-primary-accent"
@@ -302,7 +311,7 @@ return (
                     <div className="mt-4 p-4 bg-primary-accent/10 border border-primary-accent/20 rounded-lg">
                       <p className="text-sm text-primary-accent">
                         <AlertCircle className="w-4 h-4 inline mr-1" />
-                        Liveness verification requires backend integration. Current result shows face similarity only.
+                        Liveness: {result.presentedFace.livenessStatus.replaceAll('_', ' ')} — simulated. No live-camera liveness check was performed.
                       </p>
                     </div>
                   </FadeIn>
@@ -320,10 +329,10 @@ return (
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  {isProcessing ? 'Verifying...' : 'Verify Faces'}
+                  Continue full screening
                 </Button>
                 <p className="text-sm text-muted-text mt-3">
-                  Upload both document photo and live capture to start verification
+                  Upload a document photo and selfie to continue, then explicitly select a demo scenario.
                 </p>
               </div>
             )}

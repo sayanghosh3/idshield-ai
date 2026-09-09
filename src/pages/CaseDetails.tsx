@@ -1,4 +1,9 @@
-import { useParams, Link } from 'react-router-dom';
+import { OfficerReviewPanel } from '../components/common/OfficerReviewPanel';
+import { DemoCaseContext } from '../components/common/DemoCaseContext';
+import { CaseEvidence } from '../components/common/CaseEvidence';
+import { DocumentPreview } from '../components/common/DocumentPreview';
+import { useCases } from '../hooks/useCases';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Download, AlertTriangle, CheckCircle, Shield, AlertCircle } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { Button } from '../components/common/Button';
@@ -6,13 +11,20 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/common/C
 import { Badge } from '../components/common/Badge';
 import { Tabs, TabsList, TabTrigger, TabContent } from '../components/common/Tabs';
 import { Progress } from '../components/common/Progress';
-import { mockScreeningCases } from '../mocks/screeningData';
-import { mockAuditEvents, mockReports, mockCaseNotes } from '../mocks/cases';
+import { IncompleteCase } from '../components/common/IncompleteCase';
+import { hasCompleteResult, analysisStatuses } from '../utils/screeningStatus';
+import { mockCaseNotes } from '../services/demoCatalog';
 import { formatRelativeTime, getRiskLevelColor, getRiskLevelLabel, formatScore } from '../utils/formatters';
 
 export function CaseDetails() {
   const { caseId } = useParams();
-  const caseData = mockScreeningCases.find(c => c.id === caseId || c.caseNumber === caseId) || mockScreeningCases[0];
+  const [searchParams] = useSearchParams();
+  const tab = ['overview', 'document', 'evidence', 'audit'].includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'overview';
+  const navigate = useNavigate();
+  const { cases, auditEvents: mockAuditEvents, reports: mockReports } = useCases();
+  const caseData = cases.find(c => c.id === caseId || c.caseNumber === caseId);
+  if (!caseData || caseData.riskScore === null || !hasCompleteResult(caseData)) return <IncompleteCase record={caseData} />;
+  const outcomes = analysisStatuses(caseData);
   const auditEvents = mockAuditEvents.filter(e => e.caseId === caseData.id);
   const reports = mockReports.filter(r => r.caseId === caseData.id);
   const notes = mockCaseNotes.filter(n => n.caseId === caseData.id);
@@ -20,30 +32,31 @@ export function CaseDetails() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => window.history.back()}>
+      <DemoCaseContext record={caseData} />
+      <div className="flex flex-wrap items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="Back">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-wrap items-center gap-3 mb-1">
             <h1 className="text-2xl font-bold text-text">{caseData.caseNumber}</h1>
             <Badge variant={caseData.riskLevel === 'high' ? 'danger' : caseData.riskLevel === 'review' ? 'warning' : 'success'} size="md">
               {getRiskLevelLabel(caseData.riskLevel)} RISK
             </Badge>
             <Badge variant="info" size="sm">{caseData.riskScore} / 100</Badge>
           </div>
-          <p className="text-muted-text">Subject: {caseData.documents[0]?.name.replace('Passport_', '').replace('.pdf', '').replace(/_/g, ' ')} • {formatRelativeTime(caseData.createdAt)}</p>
+          <p className="text-muted-text">Subject: {caseData.subjectName} • {formatRelativeTime(caseData.createdAt)}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={() => navigate(`/reports?caseId=${caseData.id}`)}>
             <Download className="w-4 h-4 mr-2" />
             Generate Report
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="overview" variant="line">
-        <TabsList className="grid grid-cols-4 gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Case sections">
+      <Tabs key={caseData.id + tab} defaultValue={tab} variant="line">
+        <TabsList className="flex gap-1 bg-panel-secondary p-1 rounded-lg" aria-label="Case sections">
           {['Overview', 'Document', 'Evidence', 'Audit'].map(tab => (
             <TabTrigger key={tab.toLowerCase()} value={tab.toLowerCase()}>{tab}</TabTrigger>
           ))}
@@ -176,6 +189,7 @@ export function CaseDetails() {
         </TabContent>
 
         <TabContent value="document">
+          <div className="my-4 grid grid-cols-1 sm:grid-cols-2 gap-4">{caseData.documents.map(document => <DocumentPreview key={document.id} document={document} className="w-full min-h-48 max-h-96 object-contain" />)}</div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
             <Card padding="lg">
               <CardHeader>
@@ -231,7 +245,7 @@ export function CaseDetails() {
 
                 <div className="space-y-2">
                   {caseData.validationResult?.checks?.map((check: any) => (
-                    <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border', 
+                    <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                       check.status === 'pass' && 'border-success/30',
                       check.status === 'warning' && 'border-warning/30',
                       check.status === 'fail' && 'border-danger/30',
@@ -260,7 +274,7 @@ export function CaseDetails() {
               <CardContent>
                 <div className="space-y-3 mb-6">
                   {caseData.tamperingResult?.findings?.map((finding: any) => (
-                    <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border', 
+                    <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                       finding.status === 'clean' && 'border-success/30',
                       finding.status === 'suspicious' && 'border-warning/30',
                       finding.status === 'tampered' && 'border-danger/30'
@@ -319,11 +333,11 @@ export function CaseDetails() {
                 </div>
 
                 <div className="bg-panel-secondary rounded-lg p-6 text-center">
-                  <div className="text-5xl font-bold mb-2" style={{ color: caseData.faceResult?.decision === 'match' ? '#22C55E' : '#EF4444' }}>
+                  <div className="text-5xl font-bold mb-2" style={{ color: caseData.faceResult?.decision === 'match' ? '#22C55E' : caseData.faceResult?.decision === 'mismatch' ? '#EF4444' : '#94A3B8' }}>
                     {caseData.faceResult?.similarity?.toFixed(1)}%
                   </div>
-                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : 'danger'} size="lg">
-                    {caseData.faceResult?.decision === 'match' ? 'MATCH' : 'MISMATCH'}
+                  <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : caseData.faceResult?.decision === 'mismatch' ? 'danger' : 'neutral'} size="lg">
+                    {caseData.faceResult?.decision?.toUpperCase() ?? 'NOT CHECKED'}
                   </Badge>
                   <p className="text-sm text-muted-text mt-2">Threshold: {caseData.faceResult?.threshold}%</p>
                 </div>
@@ -364,7 +378,7 @@ export function CaseDetails() {
                   <TabContent value="metadata">
                     <div className="text-center py-8 text-muted-text">
                       <Shield className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Document metadata would be displayed here</p>
+                      <p>{caseData.documents.map(document => document.name + ' — ' + document.type + ' — ' + document.size + ' bytes').join('; ')}</p>
                     </div>
                   </TabContent>
                 </Tabs>
@@ -388,7 +402,7 @@ export function CaseDetails() {
                           <p className="font-medium text-text">{event.event}</p>
                           <Badge variant={
                             event.status === 'success' ? 'success' :
-                            event.status === 'warning' ? 'warning' : 'danger'
+                            event.status === 'warning' ? 'warning' : event.status === 'error' ? 'danger' : 'info'
                           } size="sm">{event.status}</Badge>
                         </div>
                         <p className="text-sm text-muted-text">{event.actor} ({event.actorType})</p>
@@ -406,6 +420,8 @@ export function CaseDetails() {
           </div>
         </TabContent>
       </Tabs>
+      <CaseEvidence record={caseData} />
+      <OfficerReviewPanel key={caseData.id} record={caseData} />
     </div>
   );
 }
