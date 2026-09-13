@@ -6,6 +6,7 @@ def capture_frame(save_path="webcam_capture.jpg"):
     cap = cv2.VideoCapture(0)
 
     if not cap.isOpened():
+        cap.release()
         print("Could not access webcam")
         return None
 
@@ -18,6 +19,7 @@ def capture_frame(save_path="webcam_capture.jpg"):
 
         if not ret:
             print("Failed to read frame from webcam")
+            save_path = None
             break
 
         # Show the webcam image
@@ -34,6 +36,7 @@ def capture_frame(save_path="webcam_capture.jpg"):
                 print(f"Image saved to: {save_path}")
             else:
                 print("Could not save the image")
+                save_path = None
 
             break
 
