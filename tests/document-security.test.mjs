@@ -28,6 +28,43 @@ function fixture(overrides = {}) {
 const expectCode = code => error => error.code === code;
 const upload = f => f.service.upload(f.officer, f.caseId, png, 'image/png');
 
+test('revocation during the final storage read denies plaintext', async () => {
+  const f = fixture(); const { id } = await upload(f);
+  const get = f.storage.get.bind(f.storage); let calls = 0;
+  f.storage.get = async key => { const record = await get(key); if (++calls === 2) f.assignments.get(f.caseId).delete(f.officer.id); return record; };
+  await assert.rejects(f.service.read(f.officer, f.caseId, id), expectCode('ACCESS_DENIED'));
+});
+
+test('expiry during storage lookup denies plaintext', async () => {
+  const f = fixture(); const { id } = await upload(f);
+  const get = f.storage.get.bind(f.storage);
+  f.storage.get = async key => { const record = await get(key); f.officer.expiresAt = 0; return record; };
+  await assert.rejects(f.service.read(f.officer, f.caseId, id), expectCode('UNAUTHENTICATED'));
+});
+
+test('revocation during delete lookup preserves the document', async () => {
+  const f = fixture(); const { id } = await upload(f);
+  const get = f.storage.get.bind(f.storage);
+  f.storage.get = async key => { const record = await get(key); f.assignments.get(f.caseId).delete(f.supervisor.id); return record; };
+  await assert.rejects(f.service.delete(f.supervisor, f.caseId, id), expectCode('ACCESS_DENIED'));
+  assert.equal((await get(id)).deletedAt, null);
+});
+
+test('delete storage guard checks authorization at mutation', async () => {
+  const f = fixture(); const { id } = await upload(f);
+  const remove = f.storage.remove.bind(f.storage);
+  f.storage.remove = async (key, date, guard) => { f.assignments.get(f.caseId).delete(f.supervisor.id); return remove(key, date, guard); };
+  await assert.rejects(f.service.delete(f.supervisor, f.caseId, id), expectCode('ACCESS_DENIED'));
+  assert.equal((await f.storage.get(id)).deletedAt, null);
+});
+
+test('revocation during upload storage write rolls back availability', async () => {
+  const f = fixture(); const put = f.storage.put.bind(f.storage); let id;
+  f.storage.put = async record => { id = record.id; await put(record); f.assignments.get(f.caseId).delete(f.officer.id); };
+  await assert.rejects(upload(f), expectCode('AUDIT_OR_LEDGER_UNAVAILABLE'));
+  assert.ok((await f.storage.get(id)).deletedAt);
+});
+
 test('server-side upload encrypts private records with unique wrapped data keys', async () => {
   const f = fixture();
   const a = await upload(f); const b = await upload(f);
