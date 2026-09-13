@@ -1,8 +1,18 @@
 # split_data.py
 import glob, random, shutil, os
 
-images = glob.glob("images/*.jpg")
-random.shuffle(images)
+images = sorted(glob.glob("images/*.jpg"))
+if len(images) < 2:
+    raise SystemExit('At least two labeled JPEGs are required under images/.')
+for image in images:
+    if not os.path.isfile(f"labels/{os.path.splitext(os.path.basename(image))[0]}.txt"):
+        raise SystemExit('Missing annotation; use an explicit empty label for a negative example.')
+if os.path.exists('dataset'):
+    raise SystemExit('Use a new dataset directory to avoid stale train/validation files.')
+random.Random(42).shuffle(images)
+for kind in ['images', 'labels']:
+    for split in ['train', 'val']:
+        os.makedirs(f'dataset/{kind}/{split}', exist_ok=True)
 
 split_idx = int(len(images) * 0.8)  # 80% train, 20% val
 train_imgs = images[:split_idx]

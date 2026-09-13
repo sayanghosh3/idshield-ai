@@ -10,9 +10,10 @@ export function useFileUpload(
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = useCallback((file: File): string | null => {
-    if (!accept.some(type => type === '*' || file.type === type || file.type.startsWith(type.replace('*', '')))) {
+    if (!accept.some(type => type === '*' || file.type === type || (type.endsWith('/*') && file.type.startsWith(type.slice(0, -1))))) {
       return `Invalid file type. Allowed: ${accept.join(', ')}`;
     }
+    if (file.size === 0) return 'File is empty';
     if (file.size > maxSize) {
       return `File too large. Maximum size: ${maxSize / (1024 * 1024)}MB`;
     }

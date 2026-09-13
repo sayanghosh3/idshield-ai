@@ -1,7 +1,7 @@
 import { caseRepository } from './caseRepository';
 import { hasCompleteResult } from '../utils/screeningStatus';
 import { Report, AnalysisReport } from '../types';
-import { apiRequest, API_ENDPOINTS } from './api';
+import { apiRequest, apiDownload, API_ENDPOINTS } from './api';
 
 const DEMO_MODE = import.meta.env.VITE_APP_ENV !== 'production';
 
@@ -10,7 +10,7 @@ function delay(ms: number): Promise<void> {
 }
 
 export const reportService = {
-  async generateReport(caseId: string, type: Report['type'] = 'screening', format: Report['format'] = 'pdf'): Promise<Report> {
+  async generateReport(caseId: string, type: Report['type'] = 'screening', format: Report['format'] = DEMO_MODE ? 'json' : 'pdf'): Promise<Report> {
     if (DEMO_MODE) {
       if (format !== 'json') throw new Error('Demo reports support JSON export only.');
       return caseRepository.generateReport(caseId, type);
@@ -55,8 +55,7 @@ export const reportService = {
       return new Blob([report.content], { type: 'application/json' });
     }
 
-    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}${API_ENDPOINTS.reports}/${reportId}/download`);
-    return response.blob();
+    return apiDownload(`${API_ENDPOINTS.reports}/${encodeURIComponent(reportId)}/download`);
   },
 
   async previewReport(caseId: string): Promise<AnalysisReport> {
