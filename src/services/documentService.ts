@@ -96,6 +96,7 @@ export const documentService = {
   },
 
   validateFile(file: File): { valid: boolean; error?: string } {
+    if (file.size === 0) return { valid: false, error: 'File is empty' };
     if (!allowedFileTypes.includes(file.type)) {
       return { valid: false, error: 'Invalid file type. Allowed: PNG, JPG, JPEG, PDF' };
     }

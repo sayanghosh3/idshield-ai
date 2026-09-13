@@ -9,6 +9,8 @@ TARGET_TOTAL = 600
 # Group tif files by their parent document folder
 folders = glob.glob("raw_data/*/")
 print(f"Found {len(folders)} document folders")
+if not folders:
+    raise SystemExit('No document folders found under raw_data; nothing to convert.')
 
 images_per_folder = max(1, TARGET_TOTAL // len(folders))
 print(f"Taking ~{images_per_folder} images per folder to reach ~{TARGET_TOTAL} total")

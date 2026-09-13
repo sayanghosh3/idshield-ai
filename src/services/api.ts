@@ -45,31 +45,36 @@ export class ApiError extends Error {
   }
 }
 
+export function apiUrl(endpoint: string): string {
+  return `${(import.meta.env?.VITE_API_BASE_URL || '').replace(/\/$/, '')}${endpoint}`;
+}
+
+async function checkedFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers);
+  if (!headers.has('Content-Type')) {
+    if (typeof options.body === 'string') headers.set('Content-Type', 'application/json');
+    else if (options.body instanceof Blob && options.body.type) headers.set('Content-Type', options.body.type);
+  }
+  const response = await fetch(apiUrl(endpoint), { ...options, headers });
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new ApiError(error?.message || `API Error: ${response.status}`, response.status, error?.code || error?.error, error?.details);
+  }
+  return response;
+}
+
+export async function apiDownload(endpoint: string, options: RequestInit = {}): Promise<Blob> {
+  return (await checkedFetch(endpoint, options)).blob();
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const url = `${baseUrl}${endpoint}`;
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new ApiError(
-      errorData.message || `API Error: ${response.status}`,
-      response.status,
-      errorData.code,
-      errorData.details
-    );
+  const response = await checkedFetch(endpoint, options);
+  if (response.status === 204 || response.status === 205 || options.method?.toUpperCase() === 'HEAD') {
+    return { success: true, data: undefined as T };
   }
-
   return response.json();
 }
 
@@ -78,26 +83,15 @@ export async function apiUpload(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ApiResponse<UploadResponse>> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-  const url = `${baseUrl}${endpoint}`;
-
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(url, {
+  onProgress?.(0);
+  const response = await apiRequest<UploadResponse>(endpoint, {
     method: 'POST',
     body: formData,
   });
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new ApiError(
-      errorData.message || `Upload Error: ${response.status}`,
-      response.status,
-      errorData.code,
-      errorData.details
-    );
-  }
-
-  return response.json();
+  onProgress?.(100);
+  return response;
 }
