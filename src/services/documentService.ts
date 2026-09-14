@@ -19,20 +19,10 @@ import {
   maxFileSize,
 } from '../mocks';
 
-
-// ============================================================
-// CONFIGURATION
-// ============================================================
-
 const DEMO_MODE =
   import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
 
 const SIMULATED_DELAY = 600;
-
-
-// ============================================================
-// HELPERS
-// ============================================================
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -44,47 +34,20 @@ function createPreview(file: File): string {
   return URL.createObjectURL(file);
 }
 
-
-// ============================================================
-// DOCUMENT SERVICE
-// ============================================================
-
 export const documentService = {
-
-  // ----------------------------------------------------------
-  // GET DOCUMENT TYPES
-  // ----------------------------------------------------------
-
   getDocumentTypes() {
     return documentTypes;
   },
-
-
-  // ----------------------------------------------------------
-  // GET ALLOWED FILE TYPES
-  // ----------------------------------------------------------
 
   getAllowedFileTypes() {
     return allowedFileTypes;
   },
 
-
-  // ----------------------------------------------------------
-  // GET MAX FILE SIZE
-  // ----------------------------------------------------------
-
   getMaxFileSize() {
     return maxFileSize;
   },
 
-
-  // ----------------------------------------------------------
-  // VALIDATE FILE
-  // ----------------------------------------------------------
-
-  validateFile(
-    file: File
-  ): {
+  validateFile(file: File): {
     valid: boolean;
     error?: string;
   } {
@@ -99,10 +62,9 @@ export const documentService = {
     if (file.size > maxFileSize) {
       return {
         valid: false,
-        error:
-          `File too large. Maximum size: ${
-            maxFileSize / (1024 * 1024)
-          }MB`,
+        error: `File too large. Maximum size: ${
+          maxFileSize / (1024 * 1024)
+        }MB`,
       };
     }
 
@@ -111,17 +73,10 @@ export const documentService = {
     };
   },
 
-
-  // ----------------------------------------------------------
-  // UPLOAD DOCUMENT
-  // ----------------------------------------------------------
-
   async uploadDocument(
     file: File,
     documentType: DocumentType = 'passport'
   ): Promise<DocumentFile> {
-
-    // Validate before upload
     const validation = this.validateFile(file);
 
     if (!validation.valid) {
@@ -129,11 +84,6 @@ export const documentService = {
         validation.error || 'Invalid document'
       );
     }
-
-
-    // ========================================================
-    // DEMO MODE
-    // ========================================================
 
     if (DEMO_MODE) {
       await delay(300);
@@ -148,11 +98,6 @@ export const documentService = {
         uploadedAt: new Date(),
       };
     }
-
-
-    // ========================================================
-    // REAL BACKEND
-    // ========================================================
 
     const response = await apiUpload(
       API_ENDPOINTS.documents,
@@ -178,23 +123,15 @@ export const documentService = {
     };
   },
 
-
-  // ----------------------------------------------------------
-  // GET DOCUMENT
-  // ----------------------------------------------------------
-
   async getDocument(
     documentId: string
   ): Promise<DocumentFile> {
-
     if (DEMO_MODE) {
       await delay(100);
 
       const document = Object.values(
         demoDocuments
-      ).find(
-        (doc) => doc.id === documentId
-      );
+      ).find((doc) => doc.id === documentId);
 
       if (!document) {
         throw new Error('Document not found');
@@ -203,72 +140,57 @@ export const documentService = {
       return document;
     }
 
-    const response =
-      await apiRequest<DocumentFile>(
-        `${API_ENDPOINTS.documents}/${documentId}`
-      );
+    const response = await apiRequest<DocumentFile>(
+      `${API_ENDPOINTS.documents}/${documentId}`
+    );
 
     if (!response.success) {
       throw new Error(
-        response.error || 'Failed to retrieve document'
+        response.error ||
+          'Failed to retrieve document'
       );
     }
 
     return response.data;
   },
 
-
-  // ----------------------------------------------------------
-  // DELETE DOCUMENT
-  // ----------------------------------------------------------
-
   async deleteDocument(
     documentId: string
   ): Promise<void> {
-
     if (DEMO_MODE) {
       await delay(100);
       return;
     }
 
-    const response =
-      await apiRequest<void>(
-        `${API_ENDPOINTS.documents}/${documentId}`,
-        {
-          method: 'DELETE',
-        }
-      );
+    const response = await apiRequest<void>(
+      `${API_ENDPOINTS.documents}/${documentId}`,
+      {
+        method: 'DELETE',
+      }
+    );
 
     if (!response.success) {
       throw new Error(
-        response.error || 'Failed to delete document'
+        response.error ||
+          'Failed to delete document'
       );
     }
   },
-
-
-  // ----------------------------------------------------------
-  // OCR EXTRACTION
-  // ----------------------------------------------------------
 
   async extractOCR(
     documentId: string,
     documentType: DocumentType
   ): Promise<OCRResult> {
-
-    // ========================================================
-    // DEMO MODE
-    // ========================================================
-
     if (DEMO_MODE) {
       await delay(SIMULATED_DELAY * 2);
 
       const key = Object.keys(
         demoDocuments
       ).find(
-        (key) =>
-          demoDocuments[key].id === documentId &&
-          demoDocuments[key].documentType === documentType
+        (demoKey) =>
+          demoDocuments[demoKey].id === documentId &&
+          demoDocuments[demoKey].documentType ===
+            documentType
       );
 
       if (
@@ -283,22 +205,17 @@ export const documentService = {
       return demoOCRResults[key];
     }
 
-
-    // ========================================================
-    // REAL FASTAPI OCR
-    // ========================================================
-
-    const response =
-      await apiRequest<OCRResult>(
-        API_ENDPOINTS.ocr,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            fileId: documentId,
-            documentType,
-          }),
-        }
-      );
+    const response = await apiRequest<OCRResult>(
+      API_ENDPOINTS.ocr,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          fileId: documentId,
+          documentId,
+          documentType,
+        }),
+      }
+    );
 
     if (!response.success) {
       throw new Error(
@@ -309,40 +226,24 @@ export const documentService = {
     return response.data;
   },
 
-
-  // ----------------------------------------------------------
-  // MRZ PARSING
-  // ----------------------------------------------------------
-
   async parseMRZ(
     ocrResult: OCRResult
   ): Promise<MRZData | null> {
-
-    // ========================================================
-    // DEMO MODE
-    // ========================================================
-
     if (DEMO_MODE) {
       await delay(200);
 
       return ocrResult.mrz || null;
     }
 
-
-    // ========================================================
-    // REAL BACKEND
-    // ========================================================
-
-    const response =
-      await apiRequest<MRZData>(
-        `${API_ENDPOINTS.ocr}/mrz`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            ocrResult,
-          }),
-        }
-      );
+    const response = await apiRequest<MRZData>(
+      `${API_ENDPOINTS.ocr}/mrz`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          ocrResult,
+        }),
+      }
+    );
 
     if (!response.success) {
       throw new Error(
@@ -353,25 +254,9 @@ export const documentService = {
     return response.data;
   },
 
-  validateFile(file: File): { valid: boolean; error?: string } {
-    if (file.size === 0) return { valid: false, error: 'File is empty' };
-    if (!allowedFileTypes.includes(file.type)) {
-      return { valid: false, error: 'Invalid file type. Allowed: PNG, JPG, JPEG, PDF' };
-    }
-    if (file.size > maxFileSize) {
-      return { valid: false, error: `File too large. Maximum size: ${maxFileSize / (1024 * 1024)}MB` };
-    }
-    return { valid: true };
-  },
-
   getDemoDocuments() {
     return demoDocuments;
   },
 };
-
-
-// ============================================================
-// DEFAULT EXPORT
-// ============================================================
 
 export default documentService;
