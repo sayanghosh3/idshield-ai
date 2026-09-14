@@ -67,10 +67,12 @@ export function NewScreening() {
     files,
     errors,
     isDragging,
+    isUploading,
     fileInputRef,
     addFiles,
     removeFile: removeUploadedFile,
     clearFiles,
+    uploadSelectedFiles,
     handleDragOver,
     handleDragLeave,
     handleDrop,
@@ -110,63 +112,173 @@ export function NewScreening() {
 
   const handleStartScreening = useCallback(async () => {
     if (running.current) return;
+
     const scenario = demoEnabled ? activeScenario : null;
+
     if (!files.length && !scenario) {
       setError('Please upload a document or select a demo scenario');
       return;
     }
-    if (scenario && files.length && !selfie.files[0]) { setError('Add a selfie or choose a sample pair.'); return; }
-    const template = scenario ? createDemoCase(scenario) : null;
-    const identity = crypto.randomUUID();
-    const now = new Date();
-    const record: ScreeningCase = scenario ? createDemoRun(scenario, files.map(inputDocument), selfie.files[0] ? inputDocument(selfie.files[0]) : undefined, liveness) : {
-      ...(template ? withoutResults(template) : {}),
-      id: `case-${identity}`, caseNumber: `ID-${now.getFullYear()}-${identity.toUpperCase()}`,
-      subjectName: template?.subjectName ?? 'Not extracted',
-      documentType: template?.documentType ?? 'other',
-      documents: template?.documents ?? files.map((file, index) => ({
-        id: `doc-${identity}-${index}`, name: file.name, type: file.type, size: file.size,
-        preview: '', documentType: 'other' as const, uploadedAt: now,
-      })),
-      status: 'draft', riskLevel: 'unknown', riskScore: null,
-      currentStep: 'upload', stepStatuses: initialStepStatuses(),
-      createdAt: now, updatedAt: now, tags: template ? ['demo'] : ['unassessed'],
-    };
+
+    if (scenario && files.length && !selfie.files[0]) {
+      setError('Add a selfie or choose a sample pair.');
+      return;
+    }
+
     running.current = true;
     setIsProcessing(true);
     setError(null);
     setActiveTab('upload');
-    const reported = new Set<string>();
+
     try {
-      const result = await runner.current.run(record, demoStepOperation(), update => {
-        update = { ...update, caseStatus: update.status === 'completed' ? 'under_review' : 'open' };
-        caseRepository.upsert(update);
-        for (const step of STEP_ORDER) {
-          const status = update.stepStatuses![step];
-          const key = `${step}:${status}`;
-          if (!['completed', 'failed', 'skipped'].includes(status) || reported.has(key)) continue;
-          reported.add(key);
-          caseRepository.addAudit({
-            id: crypto.randomUUID(), caseId: update.id, timestamp: new Date(),
-            event: `${step.replaceAll('_', ' ')} ${status}`,
-            category: 'system', status: status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'warning',
-            actor: template ? 'Demo Engine' : 'Screening Engine', actorType: 'system',
-          });
+      // Upload real documents when the user is not running a demo scenario.
+      // The existing screening engine is still used below for the analysis
+      // stages until those backend endpoints are implemented.
+      let uploadedBackendFiles: Awaited<ReturnType<typeof uploadSelectedFiles>> = [];
+
+      if (!scenario && files.length > 0) {
+        uploadedBackendFiles = await uploadSelectedFiles();
+
+        if (uploadedBackendFiles.length === 0) {
+          throw new Error(
+            'Document upload failed. Please check the backend connection.'
+          );
         }
-        if (mounted.current) loadDemoScenario(update);
-      });
+      }
+
+      const template = scenario ? createDemoCase(scenario) : null;
+      const identity = crypto.randomUUID();
+      const now = new Date();
+
+      const record: ScreeningCase = scenario
+        ? createDemoRun(
+            scenario,
+            files.map(inputDocument),
+            selfie.files[0] ? inputDocument(selfie.files[0]) : undefined,
+            liveness
+          )
+        : {
+            ...(template ? withoutResults(template) : {}),
+            id: `case-${identity}`,
+            caseNumber: `ID-${now.getFullYear()}-${identity.toUpperCase()}`,
+            subjectName: template?.subjectName ?? 'Not extracted',
+            documentType: template?.documentType ?? 'other',
+            documents: template?.documents ?? files.map((file, index) => {
+              const uploaded = uploadedBackendFiles[index];
+
+              return {
+                id: uploaded?.id ?? `doc-${identity}-${index}`,
+                name: uploaded?.name ?? file.name,
+                type: uploaded?.type ?? file.type,
+                size: uploaded?.size ?? file.size,
+                preview: URL.createObjectURL(file),
+                documentType: 'other' as const,
+                uploadedAt: uploaded
+                  ? new Date(uploaded.uploadedAt)
+                  : now,
+              };
+            }),
+            status: 'draft',
+            riskLevel: 'unknown',
+            riskScore: null,
+            currentStep: 'upload',
+            stepStatuses: initialStepStatuses(),
+            createdAt: now,
+            updatedAt: now,
+            tags: template ? ['demo'] : ['unassessed'],
+          };
+
+      const reported = new Set<string>();
+
+      // Keep the current screening runner for now. Its analysis stages are
+      // still demo/simulated until the real OCR, validation, forensics,
+      // face, and risk endpoints are connected.
+      const result = await runner.current.run(
+        record,
+        demoStepOperation(),
+        update => {
+          update = {
+            ...update,
+            caseStatus: update.status === 'completed'
+              ? 'under_review'
+              : 'open',
+          };
+
+          caseRepository.upsert(update);
+
+          for (const step of STEP_ORDER) {
+            const status = update.stepStatuses![step];
+            const key = `${step}:${status}`;
+
+            if (
+              !['completed', 'failed', 'skipped'].includes(status) ||
+              reported.has(key)
+            ) {
+              continue;
+            }
+
+            reported.add(key);
+
+            caseRepository.addAudit({
+              id: crypto.randomUUID(),
+              caseId: update.id,
+              timestamp: new Date(),
+              event: `${step.replaceAll('_', ' ')} ${status}`,
+              category: 'system',
+              status: status === 'completed'
+                ? 'success'
+                : status === 'failed'
+                  ? 'error'
+                  : 'warning',
+              actor: template ? 'Demo Engine' : 'Screening Engine',
+              actorType: 'system',
+            });
+          }
+
+          if (mounted.current) {
+            loadDemoScenario(update);
+          }
+        }
+      );
+
       if (mounted.current) {
-        if (result.status === 'completed') { navigate('/screening/result/' + result.id, { replace: true }); return; }
+        if (result.status === 'completed') {
+          navigate('/screening/result/' + result.id, { replace: true });
+          return;
+        }
+
         setActiveTab('result');
-        if (result.status === 'incomplete') setError('Screening cancelled. No final result is available.');
+
+        if (result.status === 'incomplete') {
+          setError('Screening cancelled. No final result is available.');
+        }
       }
     } catch (err) {
-      if (mounted.current) setError(err instanceof Error ? err.message : 'Screening failed. Please try again.');
+      if (mounted.current) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Screening failed. Please try again.'
+        );
+      }
     } finally {
       running.current = false;
-      if (mounted.current) setIsProcessing(false);
+
+      if (mounted.current) {
+        setIsProcessing(false);
+      }
     }
-  }, [files, selfie.files, activeScenario, demoEnabled, liveness, loadDemoScenario, setError, navigate]);
+  }, [
+    files,
+    selfie.files,
+    activeScenario,
+    demoEnabled,
+    liveness,
+    loadDemoScenario,
+    setError,
+    navigate,
+    uploadSelectedFiles,
+  ]);
 
   const handleReset = useCallback(() => {
     runner.current.cancel();
@@ -526,13 +638,21 @@ export function NewScreening() {
                       variant="primary"
                       className="w-full justify-center gap-2"
                       onClick={handleStartScreening}
-                      disabled={isProcessing || (files.length === 0 && !activeScenario)}
-                      loading={isProcessing}
+                      disabled={isProcessing || isUploading || (files.length === 0 && !activeScenario)}
+                      loading={isProcessing || isUploading}
                       whileHover={{ scale: 1.01 }}
                       whileTap={{ scale: 0.99 }}
                     >
-                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
-                      {isProcessing ? 'Processing...' : 'Start Screening'}
+                      {isProcessing || isUploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <ArrowRight className="w-4 h-4" />
+                      )}
+                      {isUploading
+                        ? 'Uploading...'
+                        : isProcessing
+                          ? 'Processing...'
+                          : 'Start Screening'}
                     </Button>
                     <Button variant="ghost" className="w-full justify-center" disabled={isProcessing} onClick={() => setShowDemoModal(true)} whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
