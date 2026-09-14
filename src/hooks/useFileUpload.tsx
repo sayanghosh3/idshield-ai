@@ -7,7 +7,11 @@ import {
 } from 'react';
 
 import documentService from '../services/documentService';
-import type { DocumentFile } from '../types';
+
+import type {
+  DocumentFile,
+  DocumentType,
+} from '../types';
 
 
 // ============================================================
@@ -36,22 +40,16 @@ export function useFileUpload(
   ],
   maxSize: number = 10 * 1024 * 1024
 ) {
-  // Files selected in the browser
   const [files, setFiles] = useState<File[]>([]);
-
-  // Validation/upload errors
   const [errors, setErrors] = useState<Record<string, string>>({});
-
-  // Drag-and-drop state
   const [isDragging, setIsDragging] = useState(false);
 
   // Backend upload state
   const [isUploading, setIsUploading] = useState(false);
 
-  // Successfully uploaded files
+  // Successfully uploaded backend files
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
-  // File input reference
   const fileInputRef = useRef<HTMLInputElement>(null);
 
 
@@ -65,7 +63,9 @@ export function useFileUpload(
         (type) =>
           type === '*' ||
           file.type === type ||
-          file.type.startsWith(type.replace('*', ''))
+          file.type.startsWith(
+            type.replace('*', '')
+          )
       );
 
       if (!isAccepted) {
@@ -105,13 +105,13 @@ export function useFileUpload(
         }
       });
 
-      setErrors((prev) => ({
-        ...prev,
+      setErrors((previous) => ({
+        ...previous,
         ...newErrors,
       }));
 
-      setFiles((prev) => [
-        ...prev,
+      setFiles((previous) => [
+        ...previous,
         ...validFiles,
       ]);
     },
@@ -127,13 +127,16 @@ export function useFileUpload(
     (index: number) => {
       const fileToRemove = files[index];
 
-      setFiles((prev) =>
-        prev.filter((_, i) => i !== index)
+      setFiles((previous) =>
+        previous.filter(
+          (_, currentIndex) =>
+            currentIndex !== index
+        )
       );
 
       if (fileToRemove) {
-        setErrors((prev) => {
-          const next = { ...prev };
+        setErrors((previous) => {
+          const next = { ...previous };
           delete next[fileToRemove.name];
           return next;
         });
@@ -155,11 +158,13 @@ export function useFileUpload(
 
 
   // ============================================================
-  // UPLOAD FILES TO BACKEND
+  // UPLOAD SELECTED FILES
   // ============================================================
 
   const uploadSelectedFiles = useCallback(
-    async (): Promise<UploadedFile[]> => {
+    async (
+      documentType: DocumentType = 'passport'
+    ): Promise<UploadedFile[]> => {
       if (files.length === 0) {
         return [];
       }
@@ -172,36 +177,42 @@ export function useFileUpload(
         for (const file of files) {
           try {
             const uploaded: DocumentFile =
-              await documentService.uploadDocument(file);
+              await documentService.uploadDocument(
+                file,
+                documentType
+              );
 
             const uploadedFile: UploadedFile = {
               id: uploaded.id,
               name: uploaded.name,
               size: uploaded.size,
               type: uploaded.type,
-              uploadedAt: uploaded.uploadedAt.toISOString(),
+              uploadedAt:
+                uploaded.uploadedAt.toISOString(),
             };
 
             successfulUploads.push(uploadedFile);
 
-            setUploadedFiles((prev) => [
-              ...prev,
+            setUploadedFiles((previous) => [
+              ...previous,
               uploadedFile,
             ]);
+
           } catch (error) {
             const message =
               error instanceof Error
                 ? error.message
                 : 'Upload failed';
 
-            setErrors((prev) => ({
-              ...prev,
+            setErrors((previous) => ({
+              ...previous,
               [file.name]: message,
             }));
           }
         }
 
         return successfulUploads;
+
       } finally {
         setIsUploading(false);
       }
@@ -224,9 +235,9 @@ export function useFileUpload(
   // ============================================================
 
   const handleDragOver = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
 
       setIsDragging(true);
     },
@@ -239,9 +250,9 @@ export function useFileUpload(
   // ============================================================
 
   const handleDragLeave = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
 
       setIsDragging(false);
     },
@@ -254,14 +265,14 @@ export function useFileUpload(
   // ============================================================
 
   const handleDrop = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
 
       setIsDragging(false);
 
-      if (e.dataTransfer.files.length > 0) {
-        addFiles(e.dataTransfer.files);
+      if (event.dataTransfer.files.length > 0) {
+        addFiles(event.dataTransfer.files);
       }
     },
     [addFiles]
@@ -269,16 +280,18 @@ export function useFileUpload(
 
 
   // ============================================================
-  // FILE INPUT CHANGE
+  // FILE INPUT
   // ============================================================
 
   const handleFileSelect = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files) {
-        addFiles(e.target.files);
+    (
+      event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+      if (event.target.files) {
+        addFiles(event.target.files);
 
-        // Allows selecting the same file again
-        e.target.value = '';
+        // Allows selecting the same file again.
+        event.target.value = '';
       }
     },
     [addFiles]
@@ -290,42 +303,28 @@ export function useFileUpload(
   // ============================================================
 
   return {
-    // Selected browser files
     files,
-
-    // Successfully uploaded backend files
     uploadedFiles,
-
-    // Errors
     errors,
 
-    // State
     isDragging,
     isUploading,
 
-    // Input
     fileInputRef,
 
-    // File management
     addFiles,
     removeFile,
     clearFiles,
 
-    // Backend upload
     uploadSelectedFiles,
 
-    // File dialog
     openFileDialog,
 
-    // Drag and drop
     handleDragOver,
     handleDragLeave,
     handleDrop,
-
-    // File input
     handleFileSelect,
 
-    // Validation
     validateFile,
   };
 }
@@ -335,8 +334,11 @@ export function useFileUpload(
 // IMAGE PREVIEW
 // ============================================================
 
-export function useImagePreview(file: File | null) {
-  const [preview, setPreview] = useState<string | null>(null);
+export function useImagePreview(
+  file: File | null
+) {
+  const [preview, setPreview] =
+    useState<string | null>(null);
 
   useEffect(() => {
     if (!file) {
@@ -358,7 +360,7 @@ export function useImagePreview(file: File | null) {
 
 
 // ============================================================
-// IMAGE TRANSFORMATION
+// IMAGE TRANSFORM
 // ============================================================
 
 export function useImageTransform() {
@@ -373,12 +375,16 @@ export function useImageTransform() {
 
 
   const zoomIn = useCallback(() => {
-    setZoom((z) => Math.min(z * 1.2, 5));
+    setZoom((value) =>
+      Math.min(value * 1.2, 5)
+    );
   }, []);
 
 
   const zoomOut = useCallback(() => {
-    setZoom((z) => Math.max(z / 1.2, 0.1));
+    setZoom((value) =>
+      Math.max(value / 1.2, 0.1)
+    );
   }, []);
 
 
@@ -388,8 +394,11 @@ export function useImageTransform() {
 
 
   const rotate = useCallback(
-    (deg: number = 90) => {
-      setRotation((r) => (r + deg) % 360);
+    (degrees: number = 90) => {
+      setRotation(
+        (value) =>
+          (value + degrees) % 360
+      );
     },
     []
   );
@@ -408,8 +417,13 @@ export function useImageTransform() {
 
   const transformStyle = useMemo(
     () => ({
-      transform: `translate(${pan.x}px, ${pan.y}px) rotate(${rotation}deg) scale(${zoom})`,
-      transformOrigin: 'center center',
+      transform:
+        `translate(${pan.x}px, ${pan.y}px) ` +
+        `rotate(${rotation}deg) ` +
+        `scale(${zoom})`,
+
+      transformOrigin:
+        'center center',
     }),
     [pan, rotation, zoom]
   );

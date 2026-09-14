@@ -21,16 +21,7 @@ import {
 
 
 // ============================================================
-// DEMO MODE
-// ============================================================
-// true  -> use existing mock/demo data
-// false -> use FastAPI backend
-//
-// In .env:
-//
-// VITE_ENABLE_DEMO_MODE=true
-// or
-// VITE_ENABLE_DEMO_MODE=false
+// CONFIGURATION
 // ============================================================
 
 const DEMO_MODE =
@@ -49,7 +40,6 @@ function delay(ms: number): Promise<void> {
   });
 }
 
-
 function createPreview(file: File): string {
   return URL.createObjectURL(file);
 }
@@ -62,7 +52,7 @@ function createPreview(file: File): string {
 export const documentService = {
 
   // ----------------------------------------------------------
-  // DOCUMENT TYPES
+  // GET DOCUMENT TYPES
   // ----------------------------------------------------------
 
   getDocumentTypes() {
@@ -71,7 +61,7 @@ export const documentService = {
 
 
   // ----------------------------------------------------------
-  // ALLOWED FILE TYPES
+  // GET ALLOWED FILE TYPES
   // ----------------------------------------------------------
 
   getAllowedFileTypes() {
@@ -80,7 +70,7 @@ export const documentService = {
 
 
   // ----------------------------------------------------------
-  // MAX FILE SIZE
+  // GET MAX FILE SIZE
   // ----------------------------------------------------------
 
   getMaxFileSize() {
@@ -89,23 +79,49 @@ export const documentService = {
 
 
   // ----------------------------------------------------------
+  // VALIDATE FILE
+  // ----------------------------------------------------------
+
+  validateFile(
+    file: File
+  ): {
+    valid: boolean;
+    error?: string;
+  } {
+    if (!allowedFileTypes.includes(file.type)) {
+      return {
+        valid: false,
+        error:
+          'Invalid file type. Allowed: PNG, JPG, JPEG, PDF',
+      };
+    }
+
+    if (file.size > maxFileSize) {
+      return {
+        valid: false,
+        error:
+          `File too large. Maximum size: ${
+            maxFileSize / (1024 * 1024)
+          }MB`,
+      };
+    }
+
+    return {
+      valid: true,
+    };
+  },
+
+
+  // ----------------------------------------------------------
   // UPLOAD DOCUMENT
   // ----------------------------------------------------------
-  //
-  // Demo:
-  //     Creates a local browser document.
-  //
-  // Production/backend:
-  //     Sends multipart/form-data to FastAPI.
-  //
-  // Backend endpoint:
-  //     POST /api/documents
-  //
-  // ----------------------------------------------------------
 
-  async uploadDocument(file: File): Promise<DocumentFile> {
+  async uploadDocument(
+    file: File,
+    documentType: DocumentType = 'passport'
+  ): Promise<DocumentFile> {
 
-    // Validate before uploading
+    // Validate before upload
     const validation = this.validateFile(file);
 
     if (!validation.valid) {
@@ -122,28 +138,20 @@ export const documentService = {
     if (DEMO_MODE) {
       await delay(300);
 
-      const preview = createPreview(file);
-
       return {
         id: `doc-${Date.now()}`,
-
         name: file.name,
-
         size: file.size,
-
         type: file.type,
-
-        preview,
-
-        documentType: 'passport' as DocumentType,
-
+        preview: createPreview(file),
+        documentType,
         uploadedAt: new Date(),
       };
     }
 
 
     // ========================================================
-    // REAL FASTAPI BACKEND
+    // REAL BACKEND
     // ========================================================
 
     const response = await apiUpload(
@@ -151,33 +159,21 @@ export const documentService = {
       file
     );
 
-
     if (!response.success) {
       throw new Error(
         response.error || 'Document upload failed'
       );
     }
 
-
     const uploaded = response.data;
 
-
-    // Convert backend response into the frontend
-    // DocumentFile structure.
     return {
       id: uploaded.fileId,
-
       name: uploaded.fileName,
-
       size: uploaded.size,
-
       type: file.type,
-
-      // Browser preview remains local.
       preview: createPreview(file),
-
-      documentType: 'passport' as DocumentType,
-
+      documentType,
       uploadedAt: new Date(),
     };
   },
@@ -192,7 +188,6 @@ export const documentService = {
   ): Promise<DocumentFile> {
 
     if (DEMO_MODE) {
-
       await delay(100);
 
       const document = Object.values(
@@ -208,19 +203,16 @@ export const documentService = {
       return document;
     }
 
-
     const response =
       await apiRequest<DocumentFile>(
         `${API_ENDPOINTS.documents}/${documentId}`
       );
-
 
     if (!response.success) {
       throw new Error(
         response.error || 'Failed to retrieve document'
       );
     }
-
 
     return response.data;
   },
@@ -235,12 +227,9 @@ export const documentService = {
   ): Promise<void> {
 
     if (DEMO_MODE) {
-
       await delay(100);
-
       return;
     }
-
 
     const response =
       await apiRequest<void>(
@@ -249,7 +238,6 @@ export const documentService = {
           method: 'DELETE',
         }
       );
-
 
     if (!response.success) {
       throw new Error(
@@ -260,7 +248,7 @@ export const documentService = {
 
 
   // ----------------------------------------------------------
-  // OCR
+  // OCR EXTRACTION
   // ----------------------------------------------------------
 
   async extractOCR(
@@ -273,11 +261,7 @@ export const documentService = {
     // ========================================================
 
     if (DEMO_MODE) {
-
-      await delay(
-        SIMULATED_DELAY * 2
-      );
-
+      await delay(SIMULATED_DELAY * 2);
 
       const key = Object.keys(
         demoDocuments
@@ -286,7 +270,6 @@ export const documentService = {
           demoDocuments[key].id === documentId &&
           demoDocuments[key].documentType === documentType
       );
-
 
       if (
         !key ||
@@ -297,13 +280,12 @@ export const documentService = {
         );
       }
 
-
       return demoOCRResults[key];
     }
 
 
     // ========================================================
-    // REAL FASTAPI BACKEND
+    // REAL FASTAPI OCR
     // ========================================================
 
     const response =
@@ -311,21 +293,18 @@ export const documentService = {
         API_ENDPOINTS.ocr,
         {
           method: 'POST',
-
           body: JSON.stringify({
-            documentId,
+            fileId: documentId,
             documentType,
           }),
         }
       );
-
 
     if (!response.success) {
       throw new Error(
         response.error || 'OCR extraction failed'
       );
     }
-
 
     return response.data;
   },
@@ -344,7 +323,6 @@ export const documentService = {
     // ========================================================
 
     if (DEMO_MODE) {
-
       await delay(200);
 
       return ocrResult.mrz || null;
@@ -352,7 +330,7 @@ export const documentService = {
 
 
     // ========================================================
-    // REAL FASTAPI BACKEND
+    // REAL BACKEND
     // ========================================================
 
     const response =
@@ -360,13 +338,11 @@ export const documentService = {
         `${API_ENDPOINTS.ocr}/mrz`,
         {
           method: 'POST',
-
           body: JSON.stringify({
             ocrResult,
           }),
         }
       );
-
 
     if (!response.success) {
       throw new Error(
@@ -374,57 +350,12 @@ export const documentService = {
       );
     }
 
-
     return response.data;
   },
 
 
   // ----------------------------------------------------------
-  // FILE VALIDATION
-  // ----------------------------------------------------------
-
-  validateFile(
-    file: File
-  ): {
-    valid: boolean;
-    error?: string;
-  } {
-
-    // File type
-    if (!allowedFileTypes.includes(file.type)) {
-
-      return {
-        valid: false,
-
-        error:
-          'Invalid file type. Allowed: PNG, JPG, JPEG, PDF',
-      };
-    }
-
-
-    // File size
-    if (file.size > maxFileSize) {
-
-      return {
-        valid: false,
-
-        error:
-          `File too large. Maximum size: ${
-            maxFileSize /
-            (1024 * 1024)
-          }MB`,
-      };
-    }
-
-
-    return {
-      valid: true,
-    };
-  },
-
-
-  // ----------------------------------------------------------
-  // DEMO DOCUMENTS
+  // GET DEMO DOCUMENTS
   // ----------------------------------------------------------
 
   getDemoDocuments() {
