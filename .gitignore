@@ -32,6 +32,13 @@ dist/
 !.env.example
 !server/.env.example
 .private-documents/
+__pycache__/
+.venv/
+ai-models/face-recognition/dataset/
+ai-models/face-recognition/images/
+ai-models/face-recognition/raw_data/
+ai-models/face-recognition/runs/
+webcam_capture.jpg
 *.pem
 *.key
 *.log

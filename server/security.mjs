@@ -83,7 +83,10 @@ export class MemoryPrivateStorage {
   #records = new Map();
   async put(record) { this.#records.set(record.id, structuredClone(record)); }
   async get(id) { return structuredClone(this.#records.get(id)); }
-  async remove(id, deletedAt) {
+  async remove(id, deletedAt, authorize = () => {}) {
+    // The guard and mutation are synchronous here. Durable adapters must enforce
+    // the equivalent policy check inside their deletion transaction.
+    authorize();
     const record = this.#records.get(id);
     if (record) this.#records.set(id, { ...record, envelope: undefined, deletedAt });
   }
@@ -202,6 +205,7 @@ export class SecureDocumentService {
       this.authorize(principal, caseId, 'upload');
       await this.storage.put(record);
       try {
+        this.authorize(principal, caseId, 'upload');
         const event = this.audit.append({ principal, caseId, action: 'DOCUMENT_UPLOADED', result: 'allowed' });
         await this.blockchain.anchor({ caseId, documentHash: record.hash, auditHash: event.eventHash, timestamp: event.timestamp });
       } catch {
@@ -218,6 +222,7 @@ export class SecureDocumentService {
     this.authorize(principal, caseId, action);
     if (!isId(id)) fail(404, 'DOCUMENT_UNAVAILABLE');
     const record = await this.storage.get(id);
+    this.authorize(principal, caseId, action);
     if (!record || record.caseId !== caseId || record.deletedAt || Date.parse(record.retentionUntil) <= Date.now()) fail(404, 'DOCUMENT_UNAVAILABLE');
     return record;
   }
@@ -235,13 +240,14 @@ export class SecureDocumentService {
     try {
       // Recheck session, assignment, deletion and expiry after asynchronous I/O.
       await this.record(principal, caseId, id, 'read');
+      this.authorize(principal, caseId, 'read');
       this.audit.append({ principal, caseId, action: 'DOCUMENT_VIEWED', result: 'allowed' });
       return { bytes, mime: record.mime };
     } catch (error) { bytes.fill(0); throw error; }
   }
   async delete(principal, caseId, id) {
     await this.record(principal, caseId, id, 'delete');
-    await this.storage.remove(id, new Date().toISOString());
+    await this.storage.remove(id, new Date().toISOString(), () => this.authorize(principal, caseId, 'delete'));
     this.audit.append({ principal, caseId, action: 'DOCUMENT_DELETED', result: 'allowed' });
   }
   async sweepRetention(now = Date.now()) {

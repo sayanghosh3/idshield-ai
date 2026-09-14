@@ -127,8 +127,8 @@ src/
 ## 🚀 Installation & Running
 
 ### Prerequisites
-- Node.js 18+
-- npm 9+
+- Node.js 24 (see `.nvmrc` and `package.json`)
+- npm 10+
 
 ### Commands
 
@@ -137,7 +137,7 @@ src/
 cd idshield-ai
 
 # Install dependencies
-npm install
+npm ci
 
 # Start development server
 npm run dev
