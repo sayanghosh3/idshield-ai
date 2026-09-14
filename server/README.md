@@ -104,6 +104,14 @@ do not prevent multi-instance abuse. Buffer clearing is best effort in JavaScrip
 not a secure-erasure guarantee. No production security certification is claimed.
 
 ## Tests
+Authorization is rechecked after storage lookups and immediately before returning
+plaintext. The storage remove(id, deletedAt, authorize) contract requires calling
+the synchronous authorization guard immediately before mutation. The memory
+adapter does so without an intervening await. A durable adapter must enforce
+equivalent policy inside its deletion transaction; the callback alone cannot
+make a remote transaction atomic. Uploads recheck policy after storage writes
+and remove the envelope if authorization has expired or been revoked.
+
 
 `tests/document-security.test.mjs` covers unauthorized/cross-case access, session
 expiry and revocation, invalid/oversized/malformed files, fail-closed scanning,

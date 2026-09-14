@@ -22,7 +22,9 @@ export function DemoModeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setActiveScenarioValue = useCallback((scenarioId: string | null) => {
+    if (scenarioId !== null && !demoScenarios.some(scenario => scenario.id === scenarioId)) throw new Error('Unknown demo scenario');
     setActiveScenario(scenarioId);
+    setEnabled(scenarioId !== null);
   }, []);
 
   const getScenario = useCallback((scenarioId: string) => {

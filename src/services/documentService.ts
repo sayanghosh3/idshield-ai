@@ -353,10 +353,16 @@ export const documentService = {
     return response.data;
   },
 
-
-  // ----------------------------------------------------------
-  // GET DEMO DOCUMENTS
-  // ----------------------------------------------------------
+  validateFile(file: File): { valid: boolean; error?: string } {
+    if (file.size === 0) return { valid: false, error: 'File is empty' };
+    if (!allowedFileTypes.includes(file.type)) {
+      return { valid: false, error: 'Invalid file type. Allowed: PNG, JPG, JPEG, PDF' };
+    }
+    if (file.size > maxFileSize) {
+      return { valid: false, error: `File too large. Maximum size: ${maxFileSize / (1024 * 1024)}MB` };
+    }
+    return { valid: true };
+  },
 
   getDemoDocuments() {
     return demoDocuments;
