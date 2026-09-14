@@ -35,3 +35,6 @@ dist/
 *.pem
 *.key
 *.log
+backend/venv/
+__pycache__/
+.env
