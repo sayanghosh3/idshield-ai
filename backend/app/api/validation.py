@@ -1,524 +1,806 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+
+router = APIRouter(
+    prefix="/api/validate",
+    tags=["Validation"],
+)
 
 
 # ============================================================
-# AADHAAR / GENERAL IDENTITY VALIDATION
+# REQUEST MODEL
 # ============================================================
 
-def extract_information(text: str) -> dict:
-    """
-    Extract basic identity information from OCR text.
-    """
-
-    text = text.replace("\n", " ")
-    text = re.sub(r"\s+", " ", text)
-
-    # --------------------------------------------------------
-    # DOB
-    # --------------------------------------------------------
-
-    dob_match = re.search(
-        r"\b\d{2}[/-]\d{2}[/-]\d{4}\b",
-        text,
+class ValidationRequest(BaseModel):
+    ocr_result: Optional[Dict[str, Any]] = Field(
+        default=None,
+        alias="ocrResult",
     )
 
-    dob = dob_match.group() if dob_match else ""
-
-    # --------------------------------------------------------
-    # ID NUMBER
-    # --------------------------------------------------------
-
-    id_match = re.search(
-        r"\b\d{4}\s\d{4}\s\d{4}\b",
-        text,
+    document_type: Optional[str] = Field(
+        default=None,
+        alias="documentType",
     )
 
-    id_number = (
-        id_match.group()
-        if id_match
-        else ""
-    )
 
-    # --------------------------------------------------------
-    # NAME
-    # --------------------------------------------------------
+# ============================================================
+# NORMALIZATION
+# ============================================================
 
-    name = ""
+def normalize_document_type(
+    value: Optional[str],
+) -> str:
+    value = (
+        value or ""
+    ).strip().lower()
 
-    name_match = re.search(
-        r"(?:Name|नाम)\s*[:\-]?\s*"
-        r"([A-Za-z]+(?:\s+[A-Za-z]+){1,3})",
-        text,
-        re.IGNORECASE,
-    )
-
-    if name_match:
-        name = name_match.group(1).strip()
-
-    return {
-        "name": name,
-        "dob": dob,
-        "id_number": id_number,
+    aliases = {
+        "aadhar": "aadhaar",
+        "aadhar_card": "aadhaar",
+        "aadhaar_card": "aadhaar",
+        "identity": "aadhaar",
+        "id": "aadhaar",
+        "passport": "passport",
     }
 
-
-def validate_information(data: dict) -> dict:
-    """
-    Validate extracted Aadhaar/general identity fields.
-    """
-
-    name = data.get("name", "")
-    dob = data.get("dob", "")
-    id_number = data.get("id_number", "")
-
-    name_status = (
-        "PASS"
-        if name
-        else "FAIL"
+    return aliases.get(
+        value,
+        value,
     )
 
-    dob_status = (
-        "PASS"
-        if re.fullmatch(
-            r"\d{2}[/-]\d{2}[/-]\d{4}",
-            dob,
-        )
-        else "FAIL"
-    )
 
-    id_status = (
-        "PASS"
-        if re.fullmatch(
-            r"\d{4}\s\d{4}\s\d{4}",
-            id_number,
-        )
-        else "FAIL"
-    )
+def clean_text(
+    value: Any,
+) -> str:
+    if value is None:
+        return ""
 
-    passed = sum(
-        [
-            name_status == "PASS",
-            dob_status == "PASS",
-            id_status == "PASS",
-        ]
-    )
-
-    score = (
-        passed / 3
-    ) * 100
-
-    return {
-        "name": name_status,
-        "dob": dob_status,
-        "id_number": id_status,
-        "score": score,
-    }
+    return str(value).strip()
 
 
-# ============================================================
-# PASSPORT FIELD EXTRACTION
-# ============================================================
+def clean_name(
+    value: Any,
+) -> str:
+    text = clean_text(value)
 
-def extract_passport_information(
-    text: str,
-) -> dict:
-    """
-    Extract passport fields from OCR text.
-    """
-
-    # --------------------------------------------------------
-    # DATES
-    # --------------------------------------------------------
-
-    dates = re.findall(
-        r"\b\d{2}[-/]\d{2}[-/]\d{4}\b",
+    # Remove common OCR decoration.
+    text = re.sub(
+        r"[•·▪●◦]",
+        " ",
         text,
     )
 
-    dates = [
-        value.replace("/", "-")
-        for value in dates
-    ]
+    # Remove punctuation at the edges.
+    text = text.strip(
+        " .,:;|_-+=*#"
+    )
 
-    dob = dates[0] if len(dates) > 0 else ""
-    issue_date = dates[1] if len(dates) > 1 else ""
-    expiry_date = dates[2] if len(dates) > 2 else ""
-
-    # --------------------------------------------------------
-    # CARD NUMBER
-    # --------------------------------------------------------
-
-    card_numbers = re.findall(
-        r"\b\d{9}\b",
+    # Collapse whitespace.
+    text = re.sub(
+        r"\s+",
+        " ",
         text,
     )
 
-    card_number = (
-        card_numbers[0]
-        if card_numbers
-        else ""
-    )
-
-    # --------------------------------------------------------
-    # PERSONAL NUMBER
-    # --------------------------------------------------------
-
-    personal_numbers = re.findall(
-        r"\b[A-Z0-9]{10}\b",
-        text.upper(),
-    )
-
-    personal_number = (
-        personal_numbers[0]
-        if personal_numbers
-        else ""
-    )
-
-    # --------------------------------------------------------
-    # SEX
-    # --------------------------------------------------------
-
-    sex_match = re.search(
-        r"\b(F|M)\b",
-        text.upper(),
-    )
-
-    sex = (
-        sex_match.group(1)
-        if sex_match
-        else ""
-    )
-
-    # --------------------------------------------------------
-    # NAME
-    # --------------------------------------------------------
-
-    lines = [
-        line.strip()
-        for line in text.splitlines()
-        if line.strip()
-    ]
-
-    surname = ""
-    given_name = ""
-
-    for index, line in enumerate(lines):
-
-        lower = line.lower()
-
-        # ----------------------------------------------------
-        # SURNAME
-        # ----------------------------------------------------
-
-        if "surname" in lower:
-
-            for j in range(
-                index + 1,
-                min(index + 3, len(lines)),
-            ):
-
-                value = lines[j].strip(
-                    " :.-"
-                )
-
-                if any(
-                    label in value.lower()
-                    for label in [
-                        "given name",
-                        "nationality",
-                        "place of birth",
-                        "date of birth",
-                        "sex",
-                        "card no",
-                    ]
-                ):
-                    continue
-
-                if re.search(
-                    r"[A-Za-zÀ-ÿ]",
-                    value,
-                ):
-                    surname = value
-                    break
-
-        # ----------------------------------------------------
-        # GIVEN NAME
-        # ----------------------------------------------------
-
-        if "given name" in lower:
-
-            parts = re.split(
-                r"given name",
-                line,
-                maxsplit=1,
-                flags=re.IGNORECASE,
-            )
-
-            if len(parts) > 1:
-
-                value = parts[1].strip(
-                    " :.-()"
-                )
-
-                if re.search(
-                    r"[A-Za-zÀ-ÿ]{2,}",
-                    value,
-                ):
-                    given_name = value
-
-            if given_name == "":
-
-                for j in range(
-                    index + 1,
-                    min(index + 3, len(lines)),
-                ):
-
-                    value = lines[j].strip(
-                        " :.-"
-                    )
-
-                    if any(
-                        label in value.lower()
-                        for label in [
-                            "nationality",
-                            "place of birth",
-                            "date of birth",
-                            "sex",
-                            "card no",
-                        ]
-                    ):
-                        continue
-
-                    if re.search(
-                        r"[A-Za-zÀ-ÿ]{2,}",
-                        value,
-                    ):
-                        given_name = value
-                        break
-
-    surname = re.sub(
+    # Keep name characters only.
+    text = re.sub(
         r"[^A-Za-zÀ-ÿ' -]",
         "",
-        surname,
+        text,
+    )
+
+    return re.sub(
+        r"\s+",
+        " ",
+        text,
     ).strip()
 
-    given_name = re.sub(
-        r"[^A-Za-zÀ-ÿ' -]",
+
+def clean_alphanumeric(
+    value: Any,
+) -> str:
+    text = clean_text(
+        value
+    ).upper()
+
+    return re.sub(
+        r"[^A-Z0-9]",
         "",
-        given_name,
-    ).strip()
+        text,
+    )
 
-    return {
-        "surname": surname,
-        "given_name": given_name,
-        "date_of_birth": dob,
-        "date_of_issue": issue_date,
-        "date_of_expiry": expiry_date,
-        "card_number": card_number,
-        "sex": sex,
-        "personal_number": personal_number,
-    }
+
+def normalize_date(
+    value: Any,
+) -> str:
+    text = clean_text(
+        value
+    )
+
+    match = re.fullmatch(
+        r"(\d{2})[/-](\d{2})[/-](\d{4})",
+        text,
+    )
+
+    if not match:
+        return ""
+
+    return (
+        f"{match.group(1)}-"
+        f"{match.group(2)}-"
+        f"{match.group(3)}"
+    )
 
 
 # ============================================================
-# PASSPORT VALIDATION
+# FIELD VALIDATORS
 # ============================================================
 
-def _valid_date(value: str) -> bool:
+def valid_name(
+    value: Any,
+) -> bool:
+
+    name = clean_name(
+        value
+    )
+
+    if not name:
+        return False
+
+    if len(name) < 2:
+        return False
+
+    return bool(
+        re.fullmatch(
+            r"[A-Za-zÀ-ÿ]+"
+            r"(?:[A-Za-zÀ-ÿ' -]*"
+            r"[A-Za-zÀ-ÿ])?",
+            name,
+        )
+    )
+
+
+def valid_date(
+    value: Any,
+) -> bool:
+
+    date_value = normalize_date(
+        value
+    )
+
+    if not date_value:
+        return False
+
     try:
-        datetime.strptime(
-            value,
+        parsed = datetime.strptime(
+            date_value,
             "%d-%m-%Y",
         )
+
+        if parsed > datetime.now():
+            return False
+
         return True
 
     except ValueError:
         return False
 
 
-def validate_passport(
-    fields: dict,
-) -> tuple[dict, float]:
-    """
-    Validate passport OCR fields.
-    """
-
-    results = {}
-
-    # --------------------------------------------------------
-    # NAME
-    # --------------------------------------------------------
-
-    results["Surname"] = bool(
-        re.fullmatch(
-            r"[A-Za-zÀ-ÿ' -]+",
-            fields.get("surname", ""),
-        )
-    )
-
-    results["Given Name"] = bool(
-        re.fullmatch(
-            r"[A-Za-zÀ-ÿ' -]+",
-            fields.get("given_name", ""),
-        )
-    )
-
-    # --------------------------------------------------------
-    # DATES
-    # --------------------------------------------------------
-
-    results["Date of Birth"] = _valid_date(
-        fields.get("date_of_birth", "")
-    )
-
-    results["Date of Issue"] = _valid_date(
-        fields.get("date_of_issue", "")
-    )
-
-    results["Date of Expiry"] = _valid_date(
-        fields.get("date_of_expiry", "")
-    )
-
-    # --------------------------------------------------------
-    # CARD NUMBER
-    # --------------------------------------------------------
-
-    results["Card Number"] = bool(
-        re.fullmatch(
-            r"\d{9}",
-            fields.get("card_number", ""),
-        )
-    )
-
-    # --------------------------------------------------------
-    # SEX
-    # --------------------------------------------------------
-
-    results["Sex"] = (
-        fields.get("sex", "").upper()
-        in ["M", "F"]
-    )
-
-    # --------------------------------------------------------
-    # PERSONAL NUMBER
-    # --------------------------------------------------------
-
-    results["Personal Number"] = bool(
-        re.fullmatch(
-            r"[A-Z0-9]{10}",
-            fields.get(
-                "personal_number",
-                "",
-            ).upper(),
-        )
-    )
-
-    # --------------------------------------------------------
-    # DATE CONSISTENCY
-    # --------------------------------------------------------
-
-    try:
-
-        dob = datetime.strptime(
-            fields["date_of_birth"],
-            "%d-%m-%Y",
-        )
-
-        issue = datetime.strptime(
-            fields["date_of_issue"],
-            "%d-%m-%Y",
-        )
-
-        expiry = datetime.strptime(
-            fields["date_of_expiry"],
-            "%d-%m-%Y",
-        )
-
-        results["Issue After Birth"] = (
-            issue >= dob
-        )
-
-        results["Expiry After Issue"] = (
-            expiry > issue
-        )
-
-    except (
-        KeyError,
-        ValueError,
-    ):
-
-        results["Issue After Birth"] = False
-        results["Expiry After Issue"] = False
-
-    # --------------------------------------------------------
-    # SCORE
-    # --------------------------------------------------------
-
-    passed = sum(results.values())
-    total = len(results)
-
-    percentage = (
-        passed / total * 100
-        if total
-        else 0
-    )
-
-    return results, percentage
+def valid_sex(
+    value: Any,
+) -> bool:
+    return clean_text(
+        value
+    ).upper() in {
+        "M",
+        "F",
+    }
 
 
 # ============================================================
-# AADHAAR VERHOEFF CHECKSUM
+# AADHAAR VERHOEFF
 # ============================================================
 
-def validate_aadhaar_checksum(
-    aadhaar_no: str,
+def verhoeff_validate(
+    number: str,
 ) -> bool:
 
-    if (
-        not aadhaar_no.isdigit()
-        or len(aadhaar_no) != 12
+    number = re.sub(
+        r"\D",
+        "",
+        clean_text(number),
+    )
+
+    if not re.fullmatch(
+        r"\d{12}",
+        number,
     ):
         return False
 
-    d = [
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-        [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
-        [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-        [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-        [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-        [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
-        [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-        [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-        [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+    multiplication = [
+        [
+            0, 1, 2, 3, 4,
+            5, 6, 7, 8, 9,
+        ],
+        [
+            1, 2, 3, 4, 0,
+            6, 7, 8, 9, 5,
+        ],
+        [
+            2, 3, 4, 0, 1,
+            7, 8, 9, 5, 6,
+        ],
+        [
+            3, 4, 0, 1, 2,
+            8, 9, 5, 6, 7,
+        ],
+        [
+            4, 0, 1, 2, 3,
+            9, 5, 6, 7, 8,
+        ],
+        [
+            5, 9, 8, 7, 6,
+            0, 4, 3, 2, 1,
+        ],
+        [
+            6, 5, 9, 8, 7,
+            1, 0, 4, 3, 2,
+        ],
+        [
+            7, 6, 5, 9, 8,
+            2, 1, 0, 4, 3,
+        ],
+        [
+            8, 7, 6, 5, 9,
+            3, 2, 1, 0, 4,
+        ],
+        [
+            9, 8, 7, 6, 5,
+            4, 3, 2, 1, 0,
+        ],
     ]
 
-    p = [
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
-        [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
-        [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
-        [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-        [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
-        [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
-        [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
-        [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
-        [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+    permutation = [
+        [
+            0, 1, 2, 3, 4,
+            5, 6, 7, 8, 9,
+        ],
+        [
+            1, 5, 7, 6, 2,
+            8, 3, 0, 9, 4,
+        ],
+        [
+            5, 8, 0, 3, 7,
+            9, 6, 1, 4, 2,
+        ],
+        [
+            8, 9, 1, 6, 0,
+            4, 3, 5, 2, 7,
+        ],
+        [
+            9, 4, 5, 3, 1,
+            2, 6, 8, 7, 0,
+        ],
+        [
+            4, 2, 8, 6, 5,
+            7, 3, 9, 0, 1,
+        ],
+        [
+            2, 7, 9, 3, 8,
+            0, 6, 5, 1, 4,
+        ],
+        [
+            7, 0, 4, 6, 9,
+            1, 3, 2, 5, 8,
+        ],
     ]
 
-    inv = [
+    inverse = [
         0, 4, 3, 2, 1,
         5, 6, 7, 8, 9,
     ]
 
     checksum = 0
 
-    for i, digit in enumerate(aadhaar_no):
-        checksum = d[
-            checksum
-        ][
-            p[(i + 1) % 8][int(digit)]
-        ]
+    digits = [
+        int(digit)
+        for digit in reversed(number)
+    ]
 
-    return inv[checksum] == 0
+    for index, digit in enumerate(
+        digits
+    ):
+        if index == 0:
+            checksum = multiplication[
+                checksum
+            ][
+                inverse[digit]
+            ]
+        else:
+            checksum = multiplication[
+                checksum
+            ][
+                permutation[
+                    index % 8
+                ][digit]
+            ]
+
+    return checksum == 0
+
+
+# ============================================================
+# PASSPORT VALIDATION
+# ============================================================
+
+def validate_passport(
+    data: Dict[str, Any],
+) -> Dict[str, bool]:
+
+    surname = clean_name(
+        data.get("surname")
+    )
+
+    given_name = clean_name(
+        data.get("given_name")
+    )
+
+    dob = normalize_date(
+        data.get("date_of_birth")
+    )
+
+    issue = normalize_date(
+        data.get("date_of_issue")
+    )
+
+    expiry = normalize_date(
+        data.get("date_of_expiry")
+    )
+
+    card_number = clean_alphanumeric(
+        data.get("card_number")
+    )
+
+    sex = clean_text(
+        data.get("sex")
+    ).upper()
+
+    personal_number = clean_alphanumeric(
+        data.get("personal_number")
+    )
+
+    checks: Dict[str, bool] = {
+        "Surname":
+            valid_name(surname),
+
+        "Given Name":
+            valid_name(given_name),
+
+        "Date of Birth":
+            valid_date(dob),
+
+        "Card Number":
+            bool(
+                re.fullmatch(
+                    r"[A-Z0-9]{7,9}",
+                    card_number,
+                )
+            ),
+
+        "Sex":
+            valid_sex(sex),
+
+        "Date of Issue":
+            valid_date(issue),
+
+        "Date of Expiry":
+            valid_date(expiry),
+
+        "Personal Number":
+            (
+                bool(
+                    re.fullmatch(
+                        r"[A-Z0-9]{1,14}",
+                        personal_number,
+                    )
+                )
+                if personal_number
+                else False
+            ),
+    }
+
+    if (
+        valid_date(dob)
+        and valid_date(issue)
+    ):
+        dob_date = datetime.strptime(
+            dob,
+            "%d-%m-%Y",
+        )
+
+        issue_date = datetime.strptime(
+            issue,
+            "%d-%m-%Y",
+        )
+
+        checks[
+            "Issue After Birth"
+        ] = (
+            issue_date >= dob_date
+        )
+    else:
+        checks[
+            "Issue After Birth"
+        ] = False
+
+    if (
+        valid_date(issue)
+        and valid_date(expiry)
+    ):
+        issue_date = datetime.strptime(
+            issue,
+            "%d-%m-%Y",
+        )
+
+        expiry_date = datetime.strptime(
+            expiry,
+            "%d-%m-%Y",
+        )
+
+        checks[
+            "Expiry After Issue"
+        ] = (
+            expiry_date > issue_date
+        )
+    else:
+        checks[
+            "Expiry After Issue"
+        ] = False
+
+    return checks
+
+
+# ============================================================
+# AADHAAR VALIDATION
+# ============================================================
+
+def validate_aadhaar(
+    data: Dict[str, Any],
+) -> Dict[str, bool]:
+
+    name = clean_name(
+        data.get("name")
+    )
+
+    dob = normalize_date(
+        data.get("date_of_birth")
+    )
+
+    number = re.sub(
+        r"\D",
+        "",
+        clean_text(
+            data.get(
+                "aadhaar_number"
+            )
+        ),
+    )
+
+    format_valid = bool(
+        re.fullmatch(
+            r"\d{12}",
+            number,
+        )
+    )
+
+    checksum_valid = (
+        verhoeff_validate(
+            number
+        )
+        if format_valid
+        else False
+    )
+
+    return {
+        "Name":
+            valid_name(name),
+
+        "Date of Birth":
+            valid_date(dob),
+
+        "Aadhaar Number Format":
+            format_valid,
+
+        "Aadhaar Verhoeff Check":
+            checksum_valid,
+    }
+
+
+# ============================================================
+# CHECK LIST FOR FRONTEND
+# ============================================================
+
+def build_check_items(
+    checks: Dict[str, bool],
+    document_type: str,
+) -> List[Dict[str, Any]]:
+
+    items: List[
+        Dict[str, Any]
+    ] = []
+
+    for name, passed in checks.items():
+
+        name_lower = name.lower()
+
+        if (
+            "date" in name_lower
+            or "birth" in name_lower
+            or "expiry" in name_lower
+        ):
+            category = "dates"
+
+        elif (
+            "aadhaar" in name_lower
+            or "card number" in name_lower
+            or "personal number" in name_lower
+        ):
+            category = "identifier"
+
+        elif (
+            "surname" in name_lower
+            or "given name" in name_lower
+            or name == "Name"
+            or name == "Sex"
+        ):
+            category = "identity"
+
+        elif (
+            "after" in name_lower
+        ):
+            category = "consistency"
+
+        else:
+            category = "document"
+
+        items.append(
+            {
+                "id": (
+                    f"{document_type}-"
+                    f"{re.sub(r'[^a-z0-9]+', '-', name_lower).strip('-')}"
+                ),
+
+                "name": name,
+
+                "description": (
+                    f"{name} check passed."
+                    if passed
+                    else (
+                        f"{name} check failed "
+                        "or could not be verified."
+                    )
+                ),
+
+                "category": category,
+
+                "status": (
+                    "pass"
+                    if passed
+                    else "fail"
+                ),
+            }
+        )
+
+    return items
+
+
+# ============================================================
+# SCORE
+# ============================================================
+
+def calculate_score(
+    checks: Dict[str, bool],
+) -> float:
+
+    if not checks:
+        return 0.0
+
+    passed = sum(
+        1
+        for value in checks.values()
+        if value
+    )
+
+    return round(
+        (
+            passed
+            / len(checks)
+        )
+        * 100,
+        2,
+    )
+
+
+def get_status(
+    score: float,
+) -> str:
+
+    if score >= 90:
+        return "pass"
+
+    if score >= 60:
+        return "warning"
+
+    return "fail"
+
+
+# ============================================================
+# MAIN VALIDATION
+# ============================================================
+
+def validate_ocr_result(
+    ocr_result: Dict[str, Any],
+    document_type: Optional[str] = None,
+) -> Dict[str, Any]:
+
+    resolved_type = normalize_document_type(
+        document_type
+        or ocr_result.get(
+            "documentType"
+        )
+        or "passport"
+    )
+
+    if resolved_type not in {
+        "aadhaar",
+        "passport",
+    }:
+        raise ValueError(
+            "Unsupported document type"
+        )
+
+    if resolved_type == "aadhaar":
+
+        data = (
+            ocr_result.get(
+                "aadhaarData"
+            )
+            or ocr_result.get(
+                "data"
+            )
+            or {}
+        )
+
+        raw_checks = validate_aadhaar(
+            data
+        )
+
+    else:
+
+        data = (
+            ocr_result.get(
+                "passportData"
+            )
+            or ocr_result.get(
+                "data"
+            )
+            or {}
+        )
+
+        raw_checks = validate_passport(
+            data
+        )
+
+    score = calculate_score(
+        raw_checks
+    )
+
+    status = get_status(
+        score
+    )
+
+    check_items = build_check_items(
+        raw_checks,
+        resolved_type,
+    )
+
+    passed = sum(
+        1
+        for check in check_items
+        if check["status"] == "pass"
+    )
+
+    failed = sum(
+        1
+        for check in check_items
+        if check["status"] == "fail"
+    )
+
+    warnings = sum(
+        1
+        for check in check_items
+        if check["status"] == "warning"
+    )
+
+    return {
+        "documentType":
+            resolved_type,
+
+        "overallStatus":
+            status,
+
+        "score":
+            score,
+
+        "passed":
+            passed,
+
+        "warnings":
+            warnings,
+
+        "failed":
+            failed,
+
+        "checks":
+            check_items,
+
+        "rawChecks":
+            raw_checks,
+    }
+
+
+# ============================================================
+# API ENDPOINT
+# ============================================================
+
+@router.post("")
+def validate_document(
+    request: ValidationRequest,
+) -> Dict[str, Any]:
+
+    if not request.ocr_result:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "ocrResult is required. "
+                "Send the OCR response from /api/ocr."
+            ),
+        )
+
+    try:
+
+        result = validate_ocr_result(
+            request.ocr_result,
+            request.document_type,
+        )
+
+        return {
+            "success":
+                True,
+
+            "data":
+                result,
+        }
+
+    except ValueError as exc:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
+
+    except Exception as exc:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Document validation failed: "
+                f"{exc}"
+            ),
+        ) from exc
