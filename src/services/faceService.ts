@@ -1,80 +1,160 @@
-import { FaceVerificationResult } from '../types';
-import { apiRequest, API_ENDPOINTS } from './api';
+export interface FaceVerificationResult {
+  similarity: number;
+  decision: 'match' | 'mismatch';
+  verified: boolean;
+  distance: number;
+  threshold: number;
+  model: string;
+  detector: string;
+  liveness: 'not_checked' | 'live' | 'spoof' | 'unknown';
 
-const DEMO_MODE = import.meta.env.VITE_APP_ENV !== 'production';
-const SIMULATED_DELAY = 1000;
+  documentFace: {
+    detected: boolean;
+    qualityScore: number;
+  };
 
-function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  presentedFace: {
+    detected: boolean;
+    qualityScore: number;
+    livenessStatus: 'not_checked' | 'live' | 'spoof' | 'unknown';
+  };
+
+  processingTime: number;
+  analysisId: string;
+  method: string;
 }
 
-export const faceService = {
+interface FaceVerificationApiResponse {
+  success: boolean;
+  data: FaceVerificationResult;
+}
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+
+const faceService = {
   async verifyFace(
-    documentImageId: string,
-    presentedImageId: string,
-    options?: { threshold?: number; requireLiveness?: boolean }
+    documentFile: File,
+    presentedFile: File,
   ): Promise<FaceVerificationResult> {
-    if (DEMO_MODE) {
-      await delay(SIMULATED_DELAY * 2);
-      return {
-        documentFace: {
-          detected: true,
-          boundingBox: { x: 0.15, y: 0.12, width: 0.28, height: 0.35 },
-          qualityScore: 92,
-        },
-        presentedFace: {
-          detected: true,
-          boundingBox: { x: 0.35, y: 0.10, width: 0.30, height: 0.38 },
-          qualityScore: 88,
-          livenessStatus: 'backend_required',
-        },
-        similarity: 96.8,
-        decision: 'match',
-        threshold: options?.threshold || 85,
-        analysisTime: 1560,
-      };
+    const allowedTypes = new Set([
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+    ]);
+
+    const maxFileSize = 10 * 1024 * 1024;
+
+    if (!(documentFile instanceof File)) {
+      throw new Error('A document face image is required.');
     }
 
-    const response = await apiRequest<FaceVerificationResult>(API_ENDPOINTS.face, {
-      method: 'POST',
-      body: JSON.stringify({ documentImageId, presentedImageId, options }),
-    });
-    return response.data;
-  },
-
-  async detectFaces(imageId: string): Promise<{ faces: Array<{ boundingBox: { x: number; y: number; width: number; height: number }; confidence: number }> }> {
-    if (DEMO_MODE) {
-      await delay(500);
-      return {
-        faces: [
-          { boundingBox: { x: 0.15, y: 0.12, width: 0.28, height: 0.35 }, confidence: 0.98 },
-        ],
-      };
+    if (!(presentedFile instanceof File)) {
+      throw new Error('A presented-person image is required.');
     }
 
-    const response = await apiRequest<{ faces: Array<{ boundingBox: { x: number; y: number; width: number; height: number }; confidence: number }> }>(
-      `${API_ENDPOINTS.face}/detect`,
-      { method: 'POST', body: JSON.stringify({ imageId }) }
+    if (!allowedTypes.has(documentFile.type)) {
+      throw new Error(
+        'The document face image must be a PNG or JPEG image.',
+      );
+    }
+
+    if (!allowedTypes.has(presentedFile.type)) {
+      throw new Error(
+        'The presented-person image must be a PNG or JPEG image.',
+      );
+    }
+
+    if (documentFile.size === 0) {
+      throw new Error(
+        'The document face image is empty.',
+      );
+    }
+
+    if (presentedFile.size === 0) {
+      throw new Error(
+        'The presented-person image is empty.',
+      );
+    }
+
+    if (documentFile.size > maxFileSize) {
+      throw new Error(
+        'The document face image must be at most 10 MiB.',
+      );
+    }
+
+    if (presentedFile.size > maxFileSize) {
+      throw new Error(
+        'The presented-person image must be at most 10 MiB.',
+      );
+    }
+
+    const formData = new FormData();
+
+    formData.append(
+      'document',
+      documentFile,
+      documentFile.name,
     );
-    return response.data;
-  },
 
-  async checkLiveness(imageId: string): Promise<{ status: 'live' | 'spoof' | 'unknown' | 'backend_required'; confidence: number }> {
-    if (DEMO_MODE) {
-      await delay(800);
-      return { status: 'backend_required', confidence: 0 };
+    formData.append(
+      'presented',
+      presentedFile,
+      presentedFile.name,
+    );
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/face/verify`,
+      {
+        method: 'POST',
+        body: formData,
+      },
+    );
+
+    let responseBody: unknown = null;
+
+    try {
+      responseBody = await response.json();
+    } catch {
+      throw new Error(
+        `Face verification returned an invalid response (${response.status}).`,
+      );
     }
 
-    const response = await apiRequest<{ status: 'live' | 'spoof' | 'unknown'; confidence: number }>(
-      `${API_ENDPOINTS.face}/liveness`,
-      { method: 'POST', body: JSON.stringify({ imageId }) }
-    );
-    return response.data;
-  },
+    if (!response.ok) {
+      const errorDetail =
+        typeof responseBody === 'object' &&
+        responseBody !== null &&
+        'detail' in responseBody &&
+        typeof responseBody.detail === 'string'
+          ? responseBody.detail
+          : `Face verification failed with HTTP ${response.status}.`;
 
-  getDefaultThreshold(): number {
-    return 85;
+      throw new Error(errorDetail);
+    }
+
+    if (
+      typeof responseBody !== 'object' ||
+      responseBody === null ||
+      !('success' in responseBody) ||
+      !('data' in responseBody)
+    ) {
+      throw new Error(
+        'Face verification returned an invalid response.',
+      );
+    }
+
+    const result =
+      responseBody as FaceVerificationApiResponse;
+
+    if (!result.success) {
+      throw new Error(
+        'Face verification was not successful.',
+      );
+    }
+
+    return result.data;
   },
 };
 
-export { faceService as default };
+export default faceService;
