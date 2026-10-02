@@ -60,7 +60,7 @@ export function createCaseRepository() {
       const event: AuditEvent = {
         id: crypto.randomUUID(), caseId: id, timestamp: now, event: 'Officer review recorded',
         category: 'user', status: 'info', actor: review.officer, actorType: 'user',
-        details: { decision: review.decision, notes: review.notes, simulated: true },
+        details: { decision: review.decision, simulated: !record.tags.includes('real-analysis') },
       };
       snapshot = { ...snapshot, cases, listItems: cases.map(toCaseListItem), auditEvents: [...snapshot.auditEvents, event] };
       emit();
@@ -71,9 +71,9 @@ export function createCaseRepository() {
       if (!record || !hasCompleteResult(record)) throw new Error('Select a completed screening case.');
       const now = new Date();
       const content = JSON.stringify({
-        demo: true, governmentDatabaseAccess: false, type, generatedAt: now,
+        demo: !record.tags.includes('real-analysis'), governmentDatabaseAccess: false, type, generatedAt: now,
         caseId: record.id, caseNumber: record.caseNumber, subjectName: record.subjectName,
-        simulation: record.demo ?? { inputSource: 'sample' },
+        simulation: record.tags.includes('real-analysis') ? null : record.demo ?? { inputSource: 'sample' },
         inputs: record.documents.map(({ name, type, size }) => ({ name, type, size })),
         selfie: record.selfie ? { name: record.selfie.name, type: record.selfie.type, size: record.selfie.size } : null,
         stepStatuses: record.stepStatuses, ocr: record.ocrResult, validation: record.validationResult,
@@ -84,12 +84,12 @@ export function createCaseRepository() {
         audit: snapshot.auditEvents.filter(event => event.caseId === id),
       }, null, 2);
       const report: Report = {
-        id: crypto.randomUUID(), caseId: id, type, title: 'Demo ' + type + ' report — ' + record.caseNumber,
-        format: 'json', status: 'ready', generatedBy: 'Demo Operator', generatedAt: now,
+        id: crypto.randomUUID(), caseId: id, type, title: (record.tags.includes('real-analysis') ? 'Live ' : 'Demo ') + type + ' report — ' + record.caseNumber,
+        format: 'json', status: 'ready', generatedBy: record.officerReview?.officer ?? 'Session Operator', generatedAt: now,
         fileSize: new TextEncoder().encode(content).length, content,
       };
       const event: AuditEvent = { id: crypto.randomUUID(), caseId: id, timestamp: now,
-        event: 'Demo JSON report generated', category: 'user', status: 'info', actor: 'Demo Operator',
+        event: (record.tags.includes('real-analysis') ? 'Live' : 'Demo') + ' JSON report generated', category: 'user', status: 'info', actor: 'Session Operator',
         actorType: 'user', details: { reportId: report.id, format: 'json' } };
       snapshot = { ...snapshot, reports: [report, ...snapshot.reports], auditEvents: [...snapshot.auditEvents, event] };
       emit();

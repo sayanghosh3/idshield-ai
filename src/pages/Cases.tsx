@@ -150,6 +150,7 @@ export function Cases() {
               columns={[
                 { key: 'caseNumber', sortable: true, header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
                 { key: 'subjectName', header: 'Name' },
+                { key: 'mode', header: 'Mode', render: (row) => <Badge variant={row.tags.includes('real-analysis') ? 'info' : 'warning'}>{row.tags.includes('real-analysis') ? 'LIVE' : 'DEMO / SAMPLE'}</Badge> },
                 { key: 'documentType', header: 'Document' },
                 { key: 'riskScore', sortable: true, header: 'Risk', render: (row) => (
                   <div className="flex items-center gap-2">

@@ -242,8 +242,8 @@ function screeningReducer(
         riskResult: action.payload.riskResult || null,
         screeningStatus: action.payload.status,
         currentStep: action.payload.currentStep,
-        progress: 100,
-        progressMessage: 'Demo scenario loaded',
+        progress: action.payload.status === 'completed' ? 100 : 0,
+        progressMessage: action.payload.tags.includes('real-analysis') ? 'Live analysis' : 'Demo scenario loaded',
         error: null,
       };
 

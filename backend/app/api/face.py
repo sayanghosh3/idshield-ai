@@ -21,6 +21,7 @@ ALLOWED_IMAGE_TYPES = {
 }
 
 MAX_FILE_SIZE = 10 * 1024 * 1024
+MODEL_READY = False
 
 
 def validate_image_type(content_type: Optional[str]) -> None:
@@ -86,6 +87,8 @@ def run_face_comparison(
     document_path: Path,
     presented_path: Path,
 ) -> dict:
+    global MODEL_READY
+    MODEL_READY = False
     try:
         from deepface import DeepFace
     except ImportError as error:
@@ -115,6 +118,7 @@ def run_face_comparison(
             f"DeepFace {type(error).__name__}: {error}"
         ) from error
 
+    MODEL_READY = True
     return {
         "verified": bool(
             result.get("verified", False)

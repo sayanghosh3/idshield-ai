@@ -25,7 +25,7 @@ ALLOWED_CONTENT_TYPES = {
 
 # Store uploaded files locally for development.
 # Later this can be replaced with object storage.
-UPLOAD_DIR = Path("storage/uploads")
+UPLOAD_DIR = Path(__file__).resolve().parents[2] / "storage" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 

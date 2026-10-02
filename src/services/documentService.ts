@@ -21,7 +21,7 @@ import {
 } from '../mocks';
 
 const DEMO_MODE =
-  import.meta.env.VITE_ENABLE_DEMO_MODE === 'true';
+  false;
 
 const SIMULATED_DELAY = 600;
 

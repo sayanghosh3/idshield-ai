@@ -57,7 +57,7 @@ export interface TamperingFinding {
   category: 'photo_integrity' | 'text_integrity' | 'stamp_integrity' | 'compression' | 'metadata' | 'overall';
   name: string;
   description: string;
-  score: number;
+  score?: number;
   status: 'clean' | 'suspicious' | 'tampered';
   region?: {
     x: number;
@@ -69,6 +69,7 @@ export interface TamperingFinding {
 }
 
 export interface TamperingResult {
+  raw?: import('../services/documentService').TamperingResult;
   findings: TamperingFinding[];
   overallScore: number;
   overallStatus: 'clean' | 'suspicious' | 'tampered';
@@ -78,6 +79,11 @@ export interface TamperingResult {
 }
 
 export interface FaceVerificationResult {
+  model?: string;
+  detector?: string;
+  distance?: number;
+  method?: string;
+  analysisId?: string;
   documentFace: {
     detected: boolean;
     boundingBox?: { x: number; y: number; width: number; height: number };
@@ -87,7 +93,7 @@ export interface FaceVerificationResult {
     detected: boolean;
     boundingBox?: { x: number; y: number; width: number; height: number };
     qualityScore: number;
-    livenessStatus: 'live' | 'spoof' | 'unknown' | 'backend_required';
+    livenessStatus: 'live' | 'spoof' | 'unknown' | 'backend_required' | 'not_checked';
   };
   similarity: number;
   decision: 'match' | 'mismatch' | 'inconclusive';
@@ -109,7 +115,7 @@ export interface RiskResult {
   level: RiskLevel;
   contributors: RiskContributor[];
   explanation: string[];
-  recommendation: 'clear' | 'secondary_inspection' | 'detain' | 'refer';
+  recommendation: 'clear' | 'secondary_inspection' | 'detain' | 'refer' | 'manual_review';
   calculatedAt: Date;
 }
 

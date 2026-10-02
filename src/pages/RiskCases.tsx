@@ -71,6 +71,7 @@ export function RiskCases() {
                     columns={[
                       { key: 'caseNumber', header: 'Case ID', className: 'font-mono font-medium', render: (row) => <Link to={`/cases/${row.id}`} className="text-primary-accent hover:underline">{row.caseNumber}</Link> },
                       { key: 'subjectName', header: 'Subject Name' },
+                      { key: 'mode', header: 'Mode', render: (row) => <Badge variant={row.tags.includes('real-analysis') ? 'info' : 'warning'}>{row.tags.includes('real-analysis') ? 'LIVE' : 'DEMO / SAMPLE'}</Badge> },
                       { key: 'documentType', header: 'Document Type' },
                       { key: 'riskScore', header: 'Risk Score', render: (row) => (
                         <div className="flex items-center gap-2">

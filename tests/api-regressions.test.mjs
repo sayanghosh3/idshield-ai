@@ -28,11 +28,11 @@ test('API keeps Headers and tuple headers, assigns correct body types, and accep
   assert.equal(calls[3].headers.has('content-type'), false);
 });
 
-test('downloads use relative URL by default, return blobs and reject error bodies', async t => {
+test('downloads use local analysis backend by default, return blobs and reject error bodies', async t => {
   let requested;
   t.mock.method(globalThis, 'fetch', async url => { requested = url; return new Response('file', { status: 200 }); });
   assert.equal(await (await api.apiDownload('/api/reports/example/download')).text(), 'file');
-  assert.equal(requested, '/api/reports/example/download');
+  assert.equal(requested, 'http://127.0.0.1:8000/api/reports/example/download');
   globalThis.fetch = async () => new Response('not found', { status: 404 });
   await assert.rejects(api.apiDownload('/api/reports/missing/download'), error => error.status === 404);
   globalThis.fetch = async () => Response.json({ error: 'UNAUTHENTICATED' }, { status: 401 });

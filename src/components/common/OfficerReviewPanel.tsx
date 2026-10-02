@@ -6,7 +6,7 @@ import { Button } from './Button';
 import { formatDateTime } from '../../utils/formatters';
 
 export function OfficerReviewPanel({ record }: { record: ScreeningCase }) {
-  const [officer, setOfficer] = useState('Demo Officer');
+  const [officer, setOfficer] = useState(record.tags.includes('real-analysis') ? '' : 'Demo Officer');
   const [decision, setDecision] = useState<OfficerReview['decision']>('secondary_inspection');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ export function OfficerReviewPanel({ record }: { record: ScreeningCase }) {
         <p className="font-semibold">{review.decision.replaceAll('_', ' ').toUpperCase()}</p>
         <p>{review.officer} • {formatDateTime(review.reviewedAt)}</p>
         <p className="whitespace-pre-wrap">{review.notes}</p>
-        <p className="text-sm text-muted-text">Recorded by the demo officer. This does not authorize a real-world enforcement action.</p>
+        <p className="text-sm text-muted-text">Recorded for this prototype session. This does not authorize a real-world enforcement action.</p>
       </div> : <form className="space-y-4" onSubmit={event => {
         event.preventDefault();
         try { caseRepository.reviewCase(record.id, { officer, decision, notes }); setError(''); }

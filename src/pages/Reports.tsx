@@ -242,7 +242,7 @@ export function Reports() {
         </StaggerContainer>
       </FadeIn>
       <Modal isOpen={!!preview} onClose={() => setPreview(null)} title={preview?.title ?? 'Report'} size="lg">
-        <p className="text-sm text-muted-text mb-3">Demo snapshot at generation time. An unreviewed case has no final officer decision.</p>
+        <p className="text-sm text-muted-text mb-3">Case snapshot at generation time (live or demo as labelled). An unreviewed case has no final officer decision.</p>
         <pre className="max-h-96 overflow-auto text-xs whitespace-pre-wrap">{preview?.content}</pre>
         {preview && <Button variant="primary" onClick={() => download(preview)}>Download JSON</Button>}
       </Modal>

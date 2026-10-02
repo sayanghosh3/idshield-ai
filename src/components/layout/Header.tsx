@@ -15,10 +15,10 @@ import { Button } from '../common';
 import { useDemoMode } from '../../hooks/useDemoMode';
 
 const mockNotifications = [
-  { id: '1', title: 'High-risk case detected', time: '2 min ago', type: 'danger', read: false },
-  { id: '2', title: 'Document analysis completed', time: '8 min ago', type: 'success', read: false },
-  { id: '3', title: 'Backend unavailable - using demo mode', time: '15 min ago', type: 'warning', read: true },
-  { id: '4', title: 'New screening case ID-2026-013 created', time: '1 hour ago', type: 'info', read: true },
+  { id: '1', title: 'Demo: High-risk case detected', time: '2 min ago', type: 'danger', read: false },
+  { id: '2', title: 'Demo: Document analysis completed', time: '8 min ago', type: 'success', read: false },
+  { id: '3', title: 'Sample notification — backend status is shown on Dashboard', time: '15 min ago', type: 'warning', read: true },
+  { id: '4', title: 'Demo: New screening case ID-2026-013 created', time: '1 hour ago', type: 'info', read: true },
 ];
 
 

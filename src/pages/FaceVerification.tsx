@@ -1,3 +1,4 @@
+import { FaceAnalysisDetails } from '../components/common/FaceAnalysisDetails';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCases } from '../hooks/useCases';
 import { DemoCaseContext } from '../components/common/DemoCaseContext';
@@ -81,7 +82,7 @@ return (
             {cases.filter(record => record.faceResult).map(record => <option key={record.id} value={record.id}>{record.caseNumber} — {record.subjectName}</option>)}
           </select>
         </label>
-        <p className="text-sm text-muted-text">Face similarity and liveness are simulated case outcomes. Uploaded photos are passed to the full demo screening flow, not independently scored here.</p>
+        <p className="text-sm text-muted-text">Select a case to inspect its labelled live or demo results. New images continue to the full screening flow. Liveness is not implemented in live analysis.</p>
         {searchParams.get('caseId') && !selectedCase && <p role="alert" className="text-danger">Case not found. Choose an existing case or start a new screening.</p>}
         <Link className="text-primary-accent" to="/screening">Start with a sample pair</Link>
       </Card>
@@ -222,6 +223,7 @@ return (
             {result ? (
               <FadeIn>
                 <div className="space-y-6">
+                  {selectedCase && <FaceAnalysisDetails record={selectedCase} />}
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="text-center">
                       <h4 className="font-medium text-text mb-3">Document Face</h4>
@@ -244,7 +246,7 @@ return (
                       </div>
                       <div className="flex justify-center gap-4 text-sm">
                         <span className="flex items-center gap-1 text-success"><CheckCircle className="w-4 h-4" /> Detected</span>
-                        <span className="flex items-center gap-1">Quality: {result.documentFace.qualityScore}%</span>
+                        <span className="flex items-center gap-1">Quality: {selectedCase?.tags.includes('real-analysis') ? 'Not measured' : result.documentFace.qualityScore + '% (simulated)'}</span>
                       </div>
                     </div>
 
@@ -253,7 +255,7 @@ return (
                       <Badge variant={result.decision === 'match' ? 'success' : result.decision === 'mismatch' ? 'danger' : 'warning'} size="lg">
                         {result.decision.toUpperCase()}
                       </Badge>
-                      <p className="text-sm text-muted-text mt-2">Threshold: {result.threshold}%</p>
+                      <p className="text-sm text-muted-text mt-2">{selectedCase?.tags.includes('real-analysis') ? 'Distance threshold' : 'Demo similarity threshold'}: {result.threshold}{selectedCase?.tags.includes('real-analysis') ? '' : '%'}</p>
                       <Progress value={result.similarity} max={100} size="md" showLabel variant={result.decision === 'match' ? 'success' : result.decision === 'mismatch' ? 'danger' : 'warning'} className="mt-4 w-64" />
                     </div>
 
@@ -278,7 +280,7 @@ return (
                       </div>
                       <div className="flex justify-center gap-4 text-sm">
                         <span className="flex items-center gap-1 text-success"><CheckCircle className="w-4 h-4" /> Detected</span>
-                        <span className="flex items-center gap-1">Quality: {result.presentedFace.qualityScore}%</span>
+                        <span className="flex items-center gap-1">Quality: {selectedCase?.tags.includes('real-analysis') ? 'Not measured' : result.presentedFace.qualityScore + '% (simulated)'}</span>
                       </div>
                       <p className="text-sm text-muted-text mt-1">Liveness: {result.presentedFace.livenessStatus.replace('_', ' ')}</p>
                     </div>
@@ -288,13 +290,13 @@ return (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-6 border-t border-border">
                       <FadeIn y={8}>
                         <div className="bg-panel-secondary rounded-lg p-4 text-center">
-                          <p className="text-2xl font-bold text-text">{result.documentFace.qualityScore}%</p>
+                          <p className="text-2xl font-bold text-text">{selectedCase?.tags.includes('real-analysis') ? 'Not measured' : result.documentFace.qualityScore + '% (simulated)'}</p>
                           <p className="text-sm text-muted-text">Doc Face Quality</p>
                         </div>
                       </FadeIn>
                       <FadeIn y={8}>
                         <div className="bg-panel-secondary rounded-lg p-4 text-center">
-                          <p className="text-2xl font-bold text-text">{result.presentedFace.qualityScore}%</p>
+                          <p className="text-2xl font-bold text-text">{selectedCase?.tags.includes('real-analysis') ? 'Not measured' : result.presentedFace.qualityScore + '% (simulated)'}</p>
                           <p className="text-sm text-muted-text">Presented Quality</p>
                         </div>
                       </FadeIn>
@@ -311,7 +313,7 @@ return (
                     <div className="mt-4 p-4 bg-primary-accent/10 border border-primary-accent/20 rounded-lg">
                       <p className="text-sm text-primary-accent">
                         <AlertCircle className="w-4 h-4 inline mr-1" />
-                        Liveness: {result.presentedFace.livenessStatus.replaceAll('_', ' ')} — simulated. No live-camera liveness check was performed.
+                        Liveness: {result.presentedFace.livenessStatus.replaceAll('_', ' ')} — {selectedCase?.tags.includes('real-analysis') ? 'NOT CHECKED' : 'simulated'}. No live-camera liveness check was performed.
                       </p>
                     </div>
                   </FadeIn>
@@ -332,7 +334,7 @@ return (
                   Continue full screening
                 </Button>
                 <p className="text-sm text-muted-text mt-3">
-                  Upload a document photo and selfie to continue, then explicitly select a demo scenario.
+                  Upload a document photo and selfie to continue, then choose live analysis or an explicit demo scenario.
                 </p>
               </div>
             )}

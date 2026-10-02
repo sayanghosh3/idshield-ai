@@ -114,11 +114,11 @@ export function Sidebar({ collapsed = false, mobile = false, onToggle }: { colla
         {!collapsed && (
           <div className="mt-6 pt-4 border-t border-border p-4">
             <div className="flex items-center gap-2 text-xs text-muted-text mb-2">
-              <Circle className="h-2 w-2 text-success" aria-hidden="true" />
-              <span>Demo services simulated</span>
+              <Circle className="h-2 w-2 text-muted-text" aria-hidden="true" />
+              <span>Service readiness on Dashboard</span>
             </div>
             <div className="px-2 py-1 bg-danger/20 text-danger text-xs font-medium rounded">
-              Demo Environment
+              Presentation Prototype
             </div>
           </div>
         )}

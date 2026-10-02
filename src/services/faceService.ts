@@ -108,6 +108,7 @@ const faceService = {
       {
         method: 'POST',
         body: formData,
+        signal: AbortSignal.timeout(180000),
       },
     );
 

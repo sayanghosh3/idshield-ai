@@ -212,12 +212,12 @@ def calculate_tampering_risk(
                 factor="Document forensics",
                 type="negative",
                 impact=impact,
-                description="Forensic analysis indicates a high probability of document manipulation.",
+                description="Forensic analysis indicates a strong indicators requiring review for possible document manipulation.",
             )
         )
 
         explanation.append(
-            f"Forensic analysis produced a tampering score of {tampering_score:.1f}%."
+            f"Forensic analysis produced a tampering score of {tampering_score:.1f}/100."
         )
 
     elif verdict in {"suspicious", "medium"}:
@@ -360,8 +360,8 @@ def calculate_ocr_risk(
 
     confidence = float(
         ocr.get(
-            "confidence",
-            100,
+            "overallConfidence",
+            ocr.get("confidence", 0),
         )
         or 0
     )

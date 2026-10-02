@@ -1,3 +1,7 @@
+import { ForensicSignals } from '../components/common/ForensicSignals';
+import { AnalysisServices } from '../components/common/AnalysisServices';
+import { liveStepOperation, normalizeForensics, extractedSubjectName } from '../services/liveWorkflow';
+import type { LiveRisk } from '../services/liveWorkflow';
 import {
   createDemoRun,
   demoStepOperation,
@@ -93,9 +97,7 @@ import {
   createDemoCase,
 } from '../services/demoCatalog';
 
-import documentService, {
-  TamperingResult,
-} from '../services/documentService';
+import documentService from '../services/documentService';
 
 import faceService, {
   FaceVerificationResult,
@@ -129,24 +131,7 @@ const SELFIE_TYPES = [
   'image/jpg',
 ];
 
-interface RiskAssessmentResult {
-  score: number;
-  level: 'low' | 'review' | 'high';
-  contributors: Array<{
-    id: string;
-    factor: string;
-    type: string;
-    impact: number;
-    description: string;
-  }>;
-  explanation: string[];
-  recommendation:
-    | 'clear'
-    | 'secondary_inspection'
-    | 'manual_review';
-  analysisId: string;
-  method: string;
-}
+type RiskAssessmentResult = LiveRisk;
 
 interface RiskApiResponse {
   success: boolean;
@@ -158,15 +143,16 @@ const API_BASE_URL =
   'http://127.0.0.1:8000';
 
 async function calculateLiveRisk(
-  validation: any,
-  tampering: any,
-  face: FaceVerificationResult,
+  validation: ScreeningCase['validationResult'],
+  tampering: ScreeningCase['tamperingResult'],
+  face: NonNullable<ScreeningCase['faceResult']>,
   ocr: OCRResult,
 ): Promise<RiskAssessmentResult> {
   const response = await fetch(
     `${API_BASE_URL}/api/risk`,
     {
       method: 'POST',
+      signal: AbortSignal.timeout(30000),
       headers: {
         'Content-Type': 'application/json',
       },
@@ -238,58 +224,6 @@ function inputDocument(
   };
 }
 
-function normalizeTamperingResult(
-  result: TamperingResult
-) {
-  const overallScore =
-    result.tamperingScore;
-
-  const overallStatus =
-    result.verdict === 'low'
-      ? 'clean'
-      : result.verdict === 'medium'
-        ? 'suspicious'
-        : 'tampered';
-
-  const findings =
-    result.findings.map(
-      (finding) => ({
-        id: finding.id,
-        name: finding.title,
-        status:
-          finding.severity === 'info'
-            ? 'clean'
-            : finding.severity === 'high' ||
-                finding.severity === 'critical'
-              ? 'tampered'
-              : 'suspicious',
-        description:
-          finding.description,
-        score:
-          finding.severity === 'info'
-            ? 0
-            : finding.severity === 'critical'
-              ? 100
-              : finding.severity === 'high'
-                ? 75
-                : finding.severity === 'medium'
-                  ? 50
-                  : 25,
-        category:
-          finding.category,
-        severity:
-          finding.severity,
-      })
-    );
-
-  return {
-    ...result,
-    overallScore,
-    overallStatus,
-    findings,
-  };
-}
-
 export function NewScreening() {
   const location = useLocation();
 
@@ -324,11 +258,6 @@ export function NewScreening() {
     progressMessage,
     error,
     addDocument,
-    setCurrentCase,
-    setUploadedDocuments,
-    setExtractedData,
-    setValidationResults,
-    setCurrentStep,
     setProgress,
     setError,
     resetScreening,
@@ -377,7 +306,7 @@ export function NewScreening() {
     setLiveTamperingResult,
   ] = useState<
     ReturnType<
-      typeof normalizeTamperingResult
+      typeof normalizeForensics
     > | null
   >(null);
 
@@ -644,289 +573,57 @@ export function NewScreening() {
               >
             > = [];
 
-          /*
-           * REAL ANALYSIS PATH
-           *
-           * Upload
-           *   ↓
-           * OCR
-           *   ↓
-           * Validation
-           *   ↓
-           * Tampering / Forensics
-           */
-          if (
-            !scenario &&
-            files.length > 0
-          ) {
-            uploadedBackendFiles =
-              await uploadSelectedFiles(
-                documentType
-              );
-
-            if (
-              uploadedBackendFiles.length ===
-              0
-            ) {
-              throw new Error(
-                'Document upload failed. Please check the backend connection.'
-              );
+          if (!scenario && files.length) {
+            if (!['passport', 'aadhaar'].includes(documentType)) throw new Error('Live analysis supports passport and Aadhaar document types.');
+            if (files.length !== 1 || !['image/png', 'image/jpeg', 'image/jpg'].includes(files[0].type)) {
+              throw new Error('Live screening supports one PNG/JPEG document. PDF forensics and live cross-document analysis are not implemented.');
             }
-
-            const firstUploaded =
-              uploadedBackendFiles[0];
-
-            /*
-             * OCR
-             */
-            const ocrResult =
-              await documentService.extractOCR(
-                firstUploaded.id,
-                documentType
-              );
-
-            /*
-             * Validation
-             */
-            const validationResult =
-              await documentService.validateDocument(
-                ocrResult,
-                documentType
-              );
-
-            /*
-             * Tampering
-             *
-             * The backend forensic endpoint
-             * currently accepts image files.
-             */
-            const firstLocalFile =
-              files[0];
-
-            if (
-              !firstLocalFile
-            ) {
-              throw new Error(
-                'No local document file is available for tampering analysis.'
-              );
-            }
-
-            if (
-              ![
-                'image/png',
-                'image/jpeg',
-                'image/jpg',
-              ].includes(
-                firstLocalFile.type
-              )
-            ) {
-              throw new Error(
-                'Tampering analysis currently supports PNG, JPG, and JPEG images. PDF forensic analysis is not enabled yet.'
-              );
-            }
-
-            const backendTamperingResult =
-              await documentService.analyzeTampering(
-                firstLocalFile
-              );
-
-            const normalizedTamperingResult =
-              normalizeTamperingResult(
-                backendTamperingResult
-              );
-
-            /*
-             * Face verification
-             *
-             * The real face backend requires:
-             *   document = identity-document image
-             *   presented = selfie / presented-person image
-             */
-            const presentedFaceFile =
-              selfie.files[0];
-
-            if (!presentedFaceFile) {
-              throw new Error(
-                'Add a selfie to run face verification.'
-              );
-            }
-
-            if (
-              ![
-                'image/png',
-                'image/jpeg',
-                'image/jpg',
-              ].includes(
-                presentedFaceFile.type
-              )
-            ) {
-              throw new Error(
-                'Face verification currently supports PNG, JPG, and JPEG selfie images.'
-              );
-            }
-
-            const faceResult =
-              await faceService.verifyFace(
-                firstLocalFile,
-                presentedFaceFile
-              );
-
-            /*
-             * Risk assessment
-             *
-             * Combine the real OCR, validation, tampering,
-             * and face-verification outputs through the
-             * backend weighted risk engine.
-             */
-            const riskAssessmentResult =
-              await calculateLiveRisk(
-                validationResult,
-                normalizedTamperingResult,
-                faceResult,
-                ocrResult,
-              );
-
-            const identity =
-              crypto.randomUUID();
-
-            const now =
-              new Date();
-
-            const realDocuments:
-              DocumentFile[] =
-              files.map(
-                (
-                  file,
-                  index
-                ) => {
-                  const uploaded =
-                    uploadedBackendFiles[
-                      index
-                    ];
-
-                  return {
-                    id:
-                      uploaded?.id ??
-                      `doc-${identity}-${index}`,
-
-                    name:
-                      uploaded?.name ??
-                      file.name,
-
-                    type:
-                      uploaded?.type ??
-                      file.type,
-
-                    size:
-                      uploaded?.size ??
-                      file.size,
-
-                    preview:
-                      URL.createObjectURL(
-                        file
-                      ),
-
-                    documentType,
-
-                    uploadedAt:
-                      uploaded
-                        ? new Date(
-                            uploaded.uploadedAt
-                          )
-                        : now,
-                  };
-                }
-              );
-
-            const realCase:
-              ScreeningCase = {
-              id: `case-${identity}`,
-
-              caseNumber:
-                `ID-${now.getFullYear()}-${identity.toUpperCase()}`,
-
-              subjectName:
-                'Not extracted',
-
-              documentType,
-
-              documents:
-                realDocuments,
-
-              status: 'draft',
-              
-              riskLevel:
-                riskAssessmentResult.level,
-
-              riskScore:
-                riskAssessmentResult.score,
-
-              currentStep:
-                'result',
-
-              stepStatuses:
-                initialStepStatuses(),
-
-              createdAt:
-                now,
-
-              updatedAt:
-                now,
-
-              tags: [
-                'real-analysis',
-              ],
+            if (selfie.files.length !== 1) throw new Error('Add exactly one selfie for live face verification.');
+            const now = new Date();
+            const identity = crypto.randomUUID();
+            const record: ScreeningCase = {
+              id: 'case-' + identity, caseNumber: 'ID-' + now.getFullYear() + '-' + identity.toUpperCase(),
+              subjectName: 'Not extracted', documentType, documents: [], selfie: inputDocument(selfie.files[0]),
+              status: 'draft', riskLevel: 'unknown', riskScore: null, currentStep: 'upload',
+              stepStatuses: initialStepStatuses(), createdAt: now, updatedAt: now, tags: ['real-analysis'],
             };
-
-            if (
-              mounted.current
-            ) {
-              setCurrentCase(
-                realCase
-              );
-
-              setUploadedDocuments(
-                realDocuments
-              );
-
-              setExtractedData(
-                ocrResult
-              );
-
-              setValidationResults(
-                validationResult
-              );
-
-              setCurrentStep(
-                'result'
-              );
-
-              setProgress(
-                100,
-                'Screening completed: OCR, validation, tampering, face verification and risk assessment'
-              );
-
-              setLiveOCRResult(
-                ocrResult
-              );
-
-              setLiveTamperingResult(
-                normalizedTamperingResult
-              );
-
-              setLiveFaceResult(
-                faceResult
-              );
-
-              setLiveRiskResult(
-                riskAssessmentResult
-              );
-
-              setActiveTab(
-                'result'
-              );
-            }
-
+            const reported = new Set<string>();
+            const result = await runner.current.run(record, liveStepOperation({
+              upload: async () => {
+                const uploaded = await uploadSelectedFiles(documentType);
+                if (!uploaded.length) throw new Error('Document upload failed. Check the backend connection or select a demo scenario.');
+                return uploaded.map((item, index) => ({ ...item, documentType, uploadedAt: new Date(item.uploadedAt), preview: URL.createObjectURL(files[index]) }));
+              },
+              ocr: id => documentService.extractOCR(id, documentType),
+              validate: ocr => documentService.validateDocument(ocr, documentType),
+              forensics: () => documentService.analyzeTampering(files[0]),
+              face: () => faceService.verifyFace(files[0], selfie.files[0]),
+              risk: data => calculateLiveRisk(data.validationResult, data.tamperingResult, data.faceResult!, data.ocrResult!),
+            }), update => {
+              update = { ...update,
+                subjectName: extractedSubjectName(update.ocrResult),
+                caseStatus: update.status === 'completed' ? 'under_review' : 'open',
+              };
+              caseRepository.upsert(update);
+              for (const step of STEP_ORDER) {
+                const status = update.stepStatuses![step];
+                const key = step + ':' + status;
+                if (!['completed', 'failed', 'skipped'].includes(status) || reported.has(key)) continue;
+                reported.add(key);
+                caseRepository.addAudit({ id: crypto.randomUUID(), caseId: update.id, timestamp: new Date(),
+                  event: step.replaceAll('_', ' ') + ' ' + status, category: 'api',
+                  status: status === 'completed' ? 'success' : status === 'failed' ? 'error' : 'warning',
+                  actor: 'Live analysis', actorType: 'api', details: { simulated: false },
+                });
+              }
+              if (mounted.current) {
+                loadDemoScenario(update);
+                setProgress(STEP_ORDER.filter(step => update.stepStatuses?.[step] === 'completed').length / STEP_ORDER.length * 100,
+                  'Live analysis: ' + update.currentStep.replaceAll('_', ' '));
+                setActiveTab(update.currentStep);
+              }
+            });
+            if (mounted.current && hasCompleteResult(result)) navigate('/screening/result/' + result.id, { replace: true });
             return;
           }
 
@@ -1226,11 +923,6 @@ export function NewScreening() {
         navigate,
         uploadSelectedFiles,
         documentType,
-        setCurrentCase,
-        setUploadedDocuments,
-        setExtractedData,
-        setValidationResults,
-        setCurrentStep,
         setProgress,
         setLiveFaceResult,
         setLiveRiskResult,
@@ -1295,6 +987,9 @@ export function NewScreening() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
+      <AnalysisServices />
+      <Badge variant={demoEnabled && activeScenario ? 'warning' : 'info'}>{demoEnabled && activeScenario ? 'DEMO DATA — SIMULATED ANALYSIS' : 'LIVE ANALYSIS — backend required'}</Badge>
+      <p className="text-sm text-muted-text">Use synthetic documents only. If the backend is unavailable, select a demo scenario. Use Reset to return to live analysis.</p>
       <FadeIn>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-4">
@@ -3011,6 +2706,7 @@ function TamperingResultsView({
 }: {
   results: any;
 }) {
+  if (results.raw) return <ForensicSignals result={results} />;
   const status =
     results.overallStatus ??
     'clean';
@@ -3463,9 +3159,7 @@ function FaceVerificationView({
 
             <p className="text-sm text-muted-text mt-2">
               Quality:{' '}
-              {results.documentFace?.qualityScore ??
-                0}
-              %
+              {results.model ? 'Not measured' : (results.documentFace?.qualityScore ?? 0) + '% (simulated)'}
             </p>
           </div>
 
@@ -3494,9 +3188,7 @@ function FaceVerificationView({
 
             <p className="text-sm text-muted-text mt-2">
               Quality:{' '}
-              {results.presentedFace?.qualityScore ??
-                0}
-              %
+              {results.model ? 'Not measured' : (results.presentedFace?.qualityScore ?? 0) + '% (simulated)'}
             </p>
 
             <p className="text-sm text-muted-text">
@@ -3559,10 +3251,7 @@ function FaceVerificationView({
         <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="bg-panel-secondary rounded-lg p-4 text-center">
             <p className="text-2xl font-bold text-text">
-              {results.documentFace
-                ?.qualityScore ??
-                0}
-              %
+              {results.model ? 'Not measured' : (results.documentFace?.qualityScore ?? 0) + '% (simulated)'}
             </p>
 
             <p className="text-sm text-muted-text">
@@ -3572,10 +3261,7 @@ function FaceVerificationView({
 
           <div className="bg-panel-secondary rounded-lg p-4 text-center">
             <p className="text-2xl font-bold text-text">
-              {results.presentedFace
-                ?.qualityScore ??
-                0}
-              %
+              {results.model ? 'Not measured' : (results.presentedFace?.qualityScore ?? 0) + '% (simulated)'}
             </p>
 
             <p className="text-sm text-muted-text">

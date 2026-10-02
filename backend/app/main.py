@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from app.health import service_health
+from app.api import face
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.audit import router as audit_router
@@ -29,6 +31,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -88,8 +92,4 @@ def root():
 
 @app.get("/health")
 def health_check():
-    return {
-        "status": "ok",
-        "service": "IDShield AI API",
-        "version": "0.1.0",
-    }
+    return service_health(face.MODEL_READY)

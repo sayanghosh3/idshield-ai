@@ -4,13 +4,14 @@ import { Card } from './Card';
 import { Badge } from './Badge';
 
 export function DemoCaseContext({ record }: { record: ScreeningCase }) {
+  const live = record.tags.includes('real-analysis');
   return <Card padding="md" className="space-y-3">
     <div className="flex flex-wrap items-center gap-2">
-      <Badge variant="warning">SIH DEMO — SIMULATED</Badge>
+      <Badge variant="warning">{live ? 'LIVE ANALYSIS' : 'SIH DEMO — SIMULATED'}</Badge>
       <span className="font-mono">{record.caseNumber}</span>
       <Badge variant={record.officerReview ? 'info' : 'warning'}>{record.officerReview ? 'Officer decision recorded' : 'Awaiting officer review'}</Badge>
     </div>
-    <p className="text-sm text-muted-text">OCR, document checks, face comparison and liveness use sample outcomes{record.demo?.inputSource === 'uploaded' ? '; uploaded images are displayed only and are not analyzed' : ''}. No government database or watchlist is connected. The risk recommendation is advisory.</p>
+    <p className="text-sm text-muted-text">{live ? 'Results returned by backend analysis. Liveness is not checked' : 'OCR, document checks, face comparison and liveness use sample outcomes'}{record.demo?.inputSource === 'uploaded' ? '; uploaded images are displayed only and are not analyzed' : ''}. No government database or watchlist is connected. The risk recommendation is advisory.</p>
     <div className="flex flex-wrap gap-4 text-sm text-primary-accent">
       <Link to={'/cases/' + record.id + '?tab=document'}>Document analysis</Link>
       <Link to={'/face?caseId=' + record.id}>Face / liveness</Link>

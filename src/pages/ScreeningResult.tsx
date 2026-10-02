@@ -1,3 +1,6 @@
+import { RiskContributors } from '../components/common/RiskContributors';
+import { ForensicSignals } from '../components/common/ForensicSignals';
+import { FaceAnalysisDetails } from '../components/common/FaceAnalysisDetails';
 import { DemoCaseContext } from '../components/common/DemoCaseContext';
 import { CaseEvidence } from '../components/common/CaseEvidence';
 import { DocumentPreview } from '../components/common/DocumentPreview';
@@ -60,7 +63,7 @@ export function ScreeningResult() {
               { label: 'Validation', status: outcomes.validation, icon: CheckCircle },
               { label: 'Tampering', status: outcomes.tampering, icon: AlertTriangle },
               { label: 'Face', status: outcomes.face, icon: Shield },
-              { label: 'Database', status: 'backend_required', icon: Shield },
+              { label: 'Database', status: 'not_connected', icon: Shield },
             ].map((item, i) => (
               <div key={i} className="bg-panel-secondary rounded-lg p-4 text-center">
                 <item.icon className="w-6 h-6 mx-auto mb-2 text-primary-accent" />
@@ -69,7 +72,7 @@ export function ScreeningResult() {
                   item.status === 'completed' || item.status === 'pass' ? 'success' :
                   item.status === 'warning' ? 'warning' :
                   item.status === 'fail' ? 'danger' : 'info'
-                } size="sm">{item.status.replace('_', ' ').toUpperCase()}</Badge>
+                } size="sm">{item.status.replaceAll('_', ' ').toUpperCase()}</Badge>
               </div>
             ))}
           </div>
@@ -112,7 +115,7 @@ export function ScreeningResult() {
             </TabContent>
             <TabContent value="ocr">
               <div className="space-y-3">
-                {caseData.ocrResult?.extractedFields?.map((field: any) => (
+                {caseData.ocrResult?.extractedFields?.map((field) => (
                   <div key={field.key} className="bg-panel-secondary rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-text">{field.label}</span>
@@ -127,7 +130,7 @@ export function ScreeningResult() {
             </TabContent>
             <TabContent value="validation">
               <div className="space-y-2">
-                {caseData.validationResult?.checks?.map((check: any) => (
+                {caseData.validationResult?.checks?.map((check) => (
                   <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                     check.status === 'pass' && 'border-success/30',
                     check.status === 'warning' && 'border-warning/30',
@@ -149,8 +152,9 @@ export function ScreeningResult() {
               </div>
             </TabContent>
             <TabContent value="tampering">
+              <ForensicSignals result={caseData.tamperingResult} />
               <div className="space-y-3">
-                {caseData.tamperingResult?.findings?.map((finding: any) => (
+                {caseData.tamperingResult?.findings?.map((finding) => (
                   <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                     finding.status === 'clean' && 'border-success/30',
                     finding.status === 'suspicious' && 'border-warning/30',
@@ -176,6 +180,7 @@ export function ScreeningResult() {
               </div>
             </TabContent>
             <TabContent value="face">
+              <FaceAnalysisDetails record={caseData} />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-panel-secondary rounded-lg p-4 text-center">
                   <p className="text-2xl font-bold text-text">{caseData.faceResult?.similarity?.toFixed(1)}%</p>
@@ -202,6 +207,7 @@ export function ScreeningResult() {
         </CardContent>
       </Card>
 
+      <Card padding="lg"><RiskContributors result={caseData.riskResult!} /></Card>
       <CaseEvidence record={caseData} />
       <div className="flex gap-3 justify-end">
         <Link to="/cases">

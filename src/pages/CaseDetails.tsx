@@ -1,3 +1,6 @@
+import { RiskContributors } from '../components/common/RiskContributors';
+import { ForensicSignals } from '../components/common/ForensicSignals';
+import { FaceAnalysisDetails } from '../components/common/FaceAnalysisDetails';
 import { OfficerReviewPanel } from '../components/common/OfficerReviewPanel';
 import { DemoCaseContext } from '../components/common/DemoCaseContext';
 import { CaseEvidence } from '../components/common/CaseEvidence';
@@ -98,26 +101,7 @@ export function CaseDetails() {
                   </div>
 
                   <div>
-                    <h4 className="font-medium text-text mb-4">Risk Contributors</h4>
-                    <div className="space-y-3">
-                      {caseData.riskResult?.contributors?.map((contributor: any) => (
-                        <div key={contributor.id} className="bg-panel-secondary rounded-lg p-4">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="font-medium text-text">{contributor.factor}</span>
-                            <Badge variant={contributor.type === 'positive' ? 'success' : 'danger'} size="sm">
-                              {contributor.type === 'positive' ? '+' : ''}{contributor.impact}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-text mb-3">{contributor.description}</p>
-                          <div className="h-2 bg-panel rounded-full overflow-hidden">
-                            <div
-                              className={cn('h-full rounded-full transition-all duration-500', contributor.type === 'positive' ? 'bg-success' : 'bg-danger')}
-                              style={{ width: `${Math.abs(contributor.impact) * 2}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <RiskContributors result={caseData.riskResult!} />
                   </div>
                 </div>
 
@@ -138,7 +122,7 @@ export function CaseDetails() {
                   <div className={cn('p-4 rounded-lg text-center', caseData.riskResult?.recommendation === 'clear' ? 'bg-success/20' : caseData.riskResult?.recommendation === 'secondary_inspection' ? 'bg-warning/20' : 'bg-danger/20')}>
                     <p className="font-medium text-lg">Recommended Action:</p>
                     <p className="text-xl font-bold mt-1" style={{ color: riskColor }}>
-                      {caseData.riskResult?.recommendation?.replace('_', ' ').toUpperCase() || 'SECONDARY INSPECTION'}
+                      {caseData.riskResult?.recommendation?.replaceAll('_', ' ').toUpperCase() || 'SECONDARY INSPECTION'}
                     </p>
                     <p className="text-sm text-muted-text mt-2">
                       This is an AI-assisted recommendation. Final determination requires human operator review.
@@ -197,7 +181,7 @@ export function CaseDetails() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {caseData.ocrResult?.extractedFields?.map((field: any) => (
+                  {caseData.ocrResult?.extractedFields?.map((field) => (
                     <div key={field.key} className="bg-panel-secondary rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-text">{field.label}</span>
@@ -244,7 +228,7 @@ export function CaseDetails() {
                 </div>
 
                 <div className="space-y-2">
-                  {caseData.validationResult?.checks?.map((check: any) => (
+                  {caseData.validationResult?.checks?.map((check) => (
                     <div key={check.id} className={cn('flex items-center gap-3 p-3 bg-panel-secondary rounded-lg border',
                       check.status === 'pass' && 'border-success/30',
                       check.status === 'warning' && 'border-warning/30',
@@ -272,8 +256,9 @@ export function CaseDetails() {
                 <CardTitle>Tampering Analysis</CardTitle>
               </CardHeader>
               <CardContent>
+                <ForensicSignals result={caseData.tamperingResult} />
                 <div className="space-y-3 mb-6">
-                  {caseData.tamperingResult?.findings?.map((finding: any) => (
+                  {caseData.tamperingResult?.findings?.map((finding) => (
                     <div key={finding.id} className={cn('p-3 bg-panel-secondary rounded-lg border',
                       finding.status === 'clean' && 'border-success/30',
                       finding.status === 'suspicious' && 'border-warning/30',
@@ -287,18 +272,18 @@ export function CaseDetails() {
                         } size="sm">{finding.status}</Badge>
                       </div>
                       <p className="text-sm text-muted-text mb-2">{finding.description}</p>
-                      <Progress value={finding.score} max={100} size="sm" variant={
+                      {finding.score !== undefined && <Progress value={finding.score} max={100} size="sm" variant={
                         finding.status === 'clean' ? 'success' :
                         finding.status === 'suspicious' ? 'warning' : 'danger'
-                      } />
+                      } />}
                     </div>
                   ))}
                 </div>
                 <div className="bg-panel-secondary rounded-lg p-4 border border-primary-accent/30">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-text">Overall Tampering Probability</span>
+                    <span className="font-medium text-text">Overall Forensic Score</span>
                     <Badge variant={caseData.tamperingResult?.overallStatus === 'clean' ? 'success' : caseData.tamperingResult?.overallStatus === 'suspicious' ? 'warning' : 'danger'} size="lg">
-                      {caseData.tamperingResult?.overallScore}%
+                      {caseData.tamperingResult?.overallScore} / 100
                     </Badge>
                   </div>
                   <Progress value={caseData.tamperingResult?.overallScore || 0} max={100} size="md" variant={
@@ -314,20 +299,21 @@ export function CaseDetails() {
                 <CardTitle>Face Verification</CardTitle>
               </CardHeader>
               <CardContent>
+                <FaceAnalysisDetails record={caseData} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
                   <div>
                     <h4 className="font-medium text-text mb-3">Document Face</h4>
                     <div className="bg-panel-secondary rounded-lg p-4 min-h-[200px] flex items-center justify-center">
                       <span className="text-muted-text">Document face crop</span>
                     </div>
-                    <p className="text-sm text-muted-text mt-2">Quality: {caseData.faceResult?.documentFace?.qualityScore}%</p>
+                    <p className="text-sm text-muted-text mt-2">Quality: {caseData.tags.includes('real-analysis') ? 'Not measured' : caseData.faceResult?.documentFace?.qualityScore + '% (simulated)'}</p>
                   </div>
                   <div>
                     <h4 className="font-medium text-text mb-3">Presented Person</h4>
                     <div className="bg-panel-secondary rounded-lg p-4 min-h-[200px] flex items-center justify-center">
                       <span className="text-muted-text">Live capture</span>
                     </div>
-                    <p className="text-sm text-muted-text mt-2">Quality: {caseData.faceResult?.presentedFace?.qualityScore}%</p>
+                    <p className="text-sm text-muted-text mt-2">Quality: {caseData.tags.includes('real-analysis') ? 'Not measured' : caseData.faceResult?.presentedFace?.qualityScore + '% (simulated)'}</p>
                     <p className="text-sm text-muted-text">Liveness: {caseData.faceResult?.presentedFace?.livenessStatus?.replace('_', ' ')}</p>
                   </div>
                 </div>
@@ -339,7 +325,7 @@ export function CaseDetails() {
                   <Badge variant={caseData.faceResult?.decision === 'match' ? 'success' : caseData.faceResult?.decision === 'mismatch' ? 'danger' : 'neutral'} size="lg">
                     {caseData.faceResult?.decision?.toUpperCase() ?? 'NOT CHECKED'}
                   </Badge>
-                  <p className="text-sm text-muted-text mt-2">Threshold: {caseData.faceResult?.threshold}%</p>
+                  <p className="text-sm text-muted-text mt-2">{caseData.tags.includes('real-analysis') ? 'Distance threshold' : 'Demo similarity threshold'}: {caseData.faceResult?.threshold}{caseData.tags.includes('real-analysis') ? '' : '%'}</p>
                 </div>
               </CardContent>
             </Card>

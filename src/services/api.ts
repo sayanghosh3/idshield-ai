@@ -46,7 +46,7 @@ export class ApiError extends Error {
 }
 
 export function apiUrl(endpoint: string): string {
-  return `${(import.meta.env?.VITE_API_BASE_URL || '').replace(/\/$/, '')}${endpoint}`;
+  return `${(import.meta.env?.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '')}${endpoint}`;
 }
 
 async function checkedFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
@@ -55,10 +55,10 @@ async function checkedFetch(endpoint: string, options: RequestInit = {}): Promis
     if (typeof options.body === 'string') headers.set('Content-Type', 'application/json');
     else if (options.body instanceof Blob && options.body.type) headers.set('Content-Type', options.body.type);
   }
-  const response = await fetch(apiUrl(endpoint), { ...options, headers });
+  const response = await fetch(apiUrl(endpoint), { ...options, headers, signal: options.signal ?? AbortSignal.timeout(120000) });
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new ApiError(error?.message || `API Error: ${response.status}`, response.status, error?.code || error?.error, error?.details);
+    throw new ApiError(error?.detail || error?.message || `API Error: ${response.status}`, response.status, error?.code || error?.error, error?.details);
   }
   return response;
 }

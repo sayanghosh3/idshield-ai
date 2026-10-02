@@ -1,4 +1,5 @@
 export type DocumentType = 
+  | 'aadhaar'
   | 'passport' 
   | 'visa' 
   | 'national_id' 

@@ -1,3 +1,4 @@
+import { AnalysisServices } from '../components/common/AnalysisServices';
 import { useCases } from '../hooks/useCases';
 import { caseStatusVariants } from '../utils/casePresentation';
 import { Link, useNavigate } from 'react-router-dom';
@@ -29,13 +30,13 @@ export function Dashboard() {
     listItems.filter(item => item.status === 'under_review').length];
   const kpiCards = kpiTemplates.map((card, index) => ({ ...card, value: String(counts[index]),
     title: card.title,
-    change: 'Demo records', trend: 'neutral' }));
+    change: 'Session data (includes demo)' , trend: 'neutral' }));
   return (
     <div className="space-y-6">
       <FadeIn>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-text">Security Screening Dashboard</h1>
+            <h1 className="text-2xl font-bold text-text">IDShield AI</h1>
             <p className="text-muted-text mt-1">AI-assisted identity and document screening</p>
           </div>
           <Link to="/screening" className="btn-primary">
@@ -86,6 +87,7 @@ export function Dashboard() {
             <Table
               columns={[
                 { key: 'caseNumber', header: 'Case ID', className: 'font-mono font-medium' },
+                { key: 'mode', header: 'Mode', render: (row) => <Badge variant={row.tags.includes('real-analysis') ? 'info' : 'warning'}>{row.tags.includes('real-analysis') ? 'LIVE' : 'DEMO / SAMPLE'}</Badge> },
                 { key: 'documentType', header: 'Document' },
                 { key: 'subjectName', header: 'Person' },
                 { key: 'riskScore', header: 'Risk Score', render: (row) => (
@@ -112,38 +114,7 @@ export function Dashboard() {
         </Card>
       </FadeIn>
 
-      <FadeIn delay={0.3}>
-        <Card padding="md">
-          <CardHeader>
-            <CardTitle>Demo Analysis Services</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <StaggerContainer staggerChildren={0.06} delayChildren={0.1}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[
-                  { name: 'OCR Engine', status: 'simulated', version: 'Sample data' },
-                  { name: 'Validation Service', status: 'simulated', version: 'Sample data' },
-                  { name: 'Forensic Analyzer', status: 'simulated', version: 'Sample data' },
-                  { name: 'Face Matcher', status: 'simulated', version: 'Sample data' },
-                ].map((service, i) => (
-                  <FadeIn key={i} delay={i * 0.06}>
-                    <div className="flex items-center justify-between p-4 bg-panel-secondary rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full bg-success" />
-                        <div>
-                          <p className="font-medium text-text">{service.name}</p>
-                          <p className="text-xs text-muted-text">{service.version}</p>
-                        </div>
-                      </div>
-                      <Badge variant="info" size="sm">{service.status}</Badge>
-                    </div>
-                  </FadeIn>
-                ))}
-              </div>
-            </StaggerContainer>
-          </CardContent>
-        </Card>
-      </FadeIn>
+      <AnalysisServices />
     </div>
   );
 }

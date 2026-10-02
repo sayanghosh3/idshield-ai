@@ -32,8 +32,9 @@ export function generateEvidence(record: ScreeningCase): EvidenceItem[] {
   const add = (type: EvidenceItem['type'], title: string, description: string, severity: EvidenceItem['severity'] = 'info') => {
     evidence.push({ id: record.id + '-evidence-' + evidence.length, type, title, description, severity, timestamp: new Date() });
   };
-  if (record.ocrResult) add('ocr', 'Simulated OCR extraction', record.ocrResult.extractedFields.length + ' fields from the selected demo scenario; not extracted from uploaded pixels.');
-  if (record.ocrResult?.mrz) add('mrz', 'Sample MRZ', [record.ocrResult.mrz.line1, record.ocrResult.mrz.line2].join('\n'));
+  const live = record.tags.includes('real-analysis');
+  if (record.ocrResult) add('ocr', live ? 'Live OCR extraction' : 'Simulated OCR extraction', record.ocrResult.extractedFields.length + (live ? ' fields returned by OCR.' : ' fields from the selected demo scenario; not extracted from uploaded pixels.'));
+  if (record.ocrResult?.mrz) add('mrz', live ? 'Extracted MRZ' : 'Sample MRZ', [record.ocrResult.mrz.line1, record.ocrResult.mrz.line2].join('\n'));
   for (const check of record.validationResult?.checks ?? []) {
     if (check.status !== 'pass') add('validation', check.name + ' — ' + check.status.replaceAll('_', ' '), check.description, check.status === 'fail' ? 'critical' : check.status === 'warning' ? 'warning' : 'info');
   }
@@ -41,9 +42,9 @@ export function generateEvidence(record: ScreeningCase): EvidenceItem[] {
     if (finding.status !== 'clean') add('tampering', finding.name, finding.description, finding.status === 'tampered' ? 'critical' : 'warning');
   }
   if (record.faceResult) {
-    add('face', 'Simulated face comparison — ' + record.faceResult.decision, record.faceResult.similarity + '% similarity; sample outcome, not a biometric measurement.', record.faceResult.decision === 'mismatch' ? 'critical' : 'info');
+    add('face', (live ? 'Live face comparison — ' : 'Simulated face comparison — ') + record.faceResult.decision, record.faceResult.similarity + (live ? ' similarity score; not an identity probability.' : '% similarity; sample outcome, not a biometric measurement.'), record.faceResult.decision === 'mismatch' ? 'critical' : 'info');
     const liveness = record.faceResult.presentedFace.livenessStatus;
-    add('face', 'Liveness — ' + liveness.replaceAll('_', ' '), 'Selected demo liveness outcome. No live-camera anti-spoofing check was performed.', liveness === 'spoof' ? 'critical' : liveness === 'live' ? 'info' : 'warning');
+    add('face', 'Liveness — ' + liveness.replaceAll('_', ' '), live ? 'LIVENESS NOT CHECKED. Anti-spoofing is not implemented.' : 'Selected demo liveness outcome. No live-camera anti-spoofing check was performed.', liveness === 'spoof' ? 'critical' : liveness === 'live' ? 'info' : 'warning');
   }
   return evidence;
 }
